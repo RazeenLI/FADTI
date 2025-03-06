@@ -5,26 +5,11 @@ from tqdm import tqdm
 from typing import Union, Optional
 import pickle
 
-from .model import CSDI
-
-class CSDIProcess(object):
+class Process(object):
     def __init__(
             self,
             model,
             learning_rate,
-            num_features,
-            num_layers,
-            num_heads,
-            num_channels,
-            num_diffusion_steps,
-            dim_time_embedding,
-            dim_feature_embedding,
-            dim_diffusion_embedding,
-            is_unconditional,
-            schedule,
-            beta_start,
-            beta_end,
-            target_strategy,
             device: Optional[Union[str, torch.device, list]] = None,
             epochs: int = 100,
             batch_size: int = 32,
@@ -39,22 +24,7 @@ class CSDIProcess(object):
         self.saving_path = None
 
         # set up model
-        self.model = CSDI(
-            num_features,
-            num_layers,
-            num_heads,
-            num_channels,
-            num_diffusion_steps,
-            dim_time_embedding,
-            dim_feature_embedding,
-            dim_diffusion_embedding,
-            is_unconditional,
-            schedule,
-            beta_start,
-            beta_end,
-            target_strategy,
-            device,
-        ).to(self.device)
+        self.model = model.to(self.device)
         
         # set up optimizer
         self.optimizer = Adam(self.model.parameters(), lr=learning_rate, weight_decay=1e-6)

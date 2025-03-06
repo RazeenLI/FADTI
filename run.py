@@ -5,6 +5,7 @@ import datetime
 import json
 import yaml
 import os
+from model.process import Process
 
 # from main_model import CSDI_Physio
 # from dataset_physio import get_dataloader
@@ -67,10 +68,9 @@ if args.data == "physio":
 
 # Load Model
 if args.model == "csdi":
-    from model.csdi.process import CSDIProcess
+    from model.csdi.model import CSDI
     config_diff = config["diffusion"]
-    model_process = CSDIProcess(
-            learning_rate=config["train"]["lr"],
+    model = CSDI(
             num_features=35,
             num_layers=config_diff["layers"],
             num_heads=config_diff["nheads"],
@@ -84,9 +84,37 @@ if args.model == "csdi":
             beta_start=config_diff["beta_start"],
             beta_end=config_diff["beta_end"],
             target_strategy=config["model"]["target_strategy"],
-            epochs=config["train"]["epochs"],
             device=args.device,
+        )
+elif args.model == "pristi":
+    from model.pristi.model import PriSTI
+    config_diff = config["diffusion"]
+    model = PriSTI(
+            num_features=35,
+            num_layers=config_diff["layers"],
+            num_heads=config_diff["nheads"],
+            num_channels=config_diff["channels"],
+            num_diffusion_steps=config_diff["num_steps"],
+            dim_time_embedding=config["model"]["timeemb"],
+            dim_feature_embedding=config["model"]["featureemb"],
+            dim_diffusion_embedding=config_diff["diffusion_embedding_dim"],
+            is_unconditional=config["model"]["is_unconditional"],
+            schedule=config_diff["schedule"],
+            beta_start=config_diff["beta_start"],
+            beta_end=config_diff["beta_end"],
+            target_strategy=config["model"]["target_strategy"],
+            device=args.device,
+            proj_t=config_diff["proj_t"], 
+            is_cross_t=config_diff["is_cross_t"],
+            is_cross_s=config_diff["is_cross_s"]
     )
+
+model_process = Process(
+        model=model,
+        learning_rate=config["train"]["lr"],
+        epochs=config["train"]["epochs"],
+        device=args.device,            
+)
 
 # train new model or load old model
 if args.modelfolder == "":

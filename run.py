@@ -1,0 +1,108 @@
+# python run.py --model "csdi" --data "physio" --nsample 100
+import argparse
+import torch
+import datetime
+import json
+import yaml
+import os
+
+# from main_model import CSDI_Physio
+# from dataset_physio import get_dataloader
+# from utils import train, evaluate
+# from csdi.model import CSDI
+
+
+# Load Arguments
+parser = argparse.ArgumentParser(description="model and data")
+
+parser.add_argument("--model", type=str, default="csdi", help="Name of the model to use")
+parser.add_argument("--data", type=str, default="physio", help="Name of the dataset to use")
+parser.add_argument('--device', default='cuda:0', help='Device for Attack')
+
+# parser.add_argument("--unconditional", action="store_true")
+parser.add_argument("--modelfolder", type=str, default="")
+parser.add_argument("--nsample", type=int, default=100)
+
+# parser.add_argument("--seed", type=int, default=1)
+# parser.add_argument("--testmissingratio", type=float, default=0.1)
+# parser.add_argument("--nfold", type=int, default=0, help="for 5fold test (valid value:[0-4])")
+
+args = parser.parse_args()
+print(args)
+
+# Load model config
+path = "config/" + args.model + ".yaml"
+with open(path, "r") as f:
+    config_model = yaml.safe_load(f)
+
+# Load data config
+path = "config/" + args.data + ".yaml"
+with open(path, "r") as f:
+    config_data = yaml.safe_load(f)
+
+config = {**config_model, **config_data}
+
+# config["model"]["is_unconditional"] = args.unconditional
+# config["model"]["test_missing_ratio"] = args.testmissingratio
+
+print(json.dumps(config, indent=4))
+
+# Create Save Place
+current_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+foldername = "./save/" + args.model + "_" + args.data + str(config["data"]["nfold"]) + "_" + current_time + "/"
+print('model folder:', foldername)
+os.makedirs(foldername, exist_ok=True)
+with open(foldername + "config.json", "w") as f:
+    json.dump(config, f, indent=4)
+
+# Load Data
+if args.data == "physio":
+    from dataset.physio import get_dataloader
+    train_loader, valid_loader, test_loader = get_dataloader(
+        seed=config["data"]["seed"],
+        nfold=config["data"]["nfold"],
+        batch_size=config["train"]["batch_size"],
+        missing_ratio=config["data"]["test_missing_ratio"],
+    )
+
+# Load Model
+if args.model == "csdi":
+    from model.csdi.process import CSDIProcess
+    config_diff = config["diffusion"]
+    model_process = CSDIProcess(
+            learning_rate=config["train"]["lr"],
+            num_features=35,
+            num_layers=config_diff["layers"],
+            num_heads=config_diff["nheads"],
+            num_channels=config_diff["channels"],
+            num_diffusion_steps=config_diff["num_steps"],
+            dim_time_embedding=config["model"]["timeemb"],
+            dim_feature_embedding=config["model"]["featureemb"],
+            dim_diffusion_embedding=config_diff["diffusion_embedding_dim"],
+            is_unconditional=config["model"]["is_unconditional"],
+            schedule=config_diff["schedule"],
+            beta_start=config_diff["beta_start"],
+            beta_end=config_diff["beta_end"],
+            target_strategy=config["model"]["target_strategy"],
+            epochs=config["train"]["epochs"],
+            device=args.device,
+    )
+
+# train new model or load old model
+if args.modelfolder == "":
+    model_process.train(
+        train_loader=train_loader,
+        valid_loader=valid_loader,
+        foldername=foldername,
+    )
+else:
+    model_process.model.load_state_dict(torch.load("./save/" + args.modelfolder + "/model.pth"))
+
+# test
+model_process.evaluate(
+    test_loader=test_loader, 
+    nsample=args.nsample, 
+    scaler=1, 
+    foldername=foldername
+)
+

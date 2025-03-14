@@ -120,7 +120,6 @@ class TemporalAttention(nn.Module):
 
     def forward(self, x, base_shape, itp_x=None):
         batch_size, num_channels, num_features, num_steps = base_shape
-        # print(f"\n\n\n\n============= x.shape = {base_shape} =============\n\n\n\n")
         if num_steps == 1:
             return x
         # Time Domain
@@ -137,16 +136,16 @@ class TemporalAttention(nn.Module):
         # weights = torch.softmax(torch.stack([self.alpha, self.beta]), dim=0)
         # v = weights[0] * v + weights[1] * x_fft
         # 拼接后再映射 cat -> linear
-        # v = torch.cat([v, v_fft], dim=-1)
-        # v = self.fusion_layer(v)
-        v = v_fft
+        v = torch.cat([v, v_fft], dim=-1)
+        v = self.fusion_layer(v)
+        # v = v_fft
 
-        # if self.is_cross:
-        #     q = itp_x.reshape(batch_size, num_channels, num_features, num_steps).permute(0, 2, 1, 3).reshape(batch_size * num_features, num_channels, num_steps).permute(2, 0, 1)
-        #     x = self.time_layer(q, v, v).permute(1, 2, 0)
-        # else:
-        #     x = self.time_layer(v, v, v).permute(1, 2, 0)
-        x = v.permute(1, 2, 0)
+        if self.is_cross:
+            q = itp_x.reshape(batch_size, num_channels, num_features, num_steps).permute(0, 2, 1, 3).reshape(batch_size * num_features, num_channels, num_steps).permute(2, 0, 1)
+            x = self.time_layer(q, v, v).permute(1, 2, 0)
+        else:
+            x = self.time_layer(v, v, v).permute(1, 2, 0)
+        # x = v.permute(1, 2, 0)
 
         x = x.reshape(batch_size, num_features, num_channels, num_steps).permute(0, 2, 1, 3).reshape(batch_size, num_channels, num_features * num_steps)
         return x

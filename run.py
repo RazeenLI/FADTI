@@ -1,4 +1,4 @@
-# python run.py --model "csdi" --data "physio" --nsample 100
+# python run.py --model "ftcsdi" --data "physio" --nsample 100 --device "cuda:6"
 import argparse
 import torch
 import datetime
@@ -106,8 +106,29 @@ elif args.model == "pristi":
             device=args.device,
             proj_t=config_diff["proj_t"], 
             is_cross_t=config_diff["is_cross_t"],
-            is_cross_s=config_diff["is_cross_s"]
+            is_cross_s=config_diff["is_cross_s"],
+            use_guide=config["model"]["use_guide"]
     )
+elif args.model == "ftcsdi":
+    from model.fourier_t_csdi.model import FTCSDI
+    config_diff = config["diffusion"]
+    model = FTCSDI(
+            num_features=35,
+            num_layers=config_diff["layers"],
+            num_heads=config_diff["nheads"],
+            num_channels=config_diff["channels"],
+            num_diffusion_steps=config_diff["num_steps"],
+            num_steps=48,
+            dim_time_embedding=config["model"]["timeemb"],
+            dim_feature_embedding=config["model"]["featureemb"],
+            dim_diffusion_embedding=config_diff["diffusion_embedding_dim"],
+            is_unconditional=config["model"]["is_unconditional"],
+            schedule=config_diff["schedule"],
+            beta_start=config_diff["beta_start"],
+            beta_end=config_diff["beta_end"],
+            target_strategy=config["model"]["target_strategy"],
+            device=args.device,
+        )
 
 model_process = Process(
         model=model,

@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 
 from .layers import DiffusionFTCSDI
+
 from nn.process_data import get_process_data
 
 class FTCSDI(nn.Module):
@@ -277,6 +278,7 @@ class FTCSDI(nn.Module):
             
         elif not self.training:
             # Validating
+
             res = self.process_data(inputs, self.device)
 
             (
@@ -310,8 +312,10 @@ class FTCSDI(nn.Module):
             inputs,
             num_sampling_times=1,
     ):
+
         # results = {}
         res = self.process_data(inputs, self.device)
+
 
         (
             observed_data,
@@ -326,6 +330,7 @@ class FTCSDI(nn.Module):
             res["gt_mask"],
             res["cut_length"],
         )
+
         with torch.no_grad():
             cond_mask = gt_mask
             target_mask = observed_mask - cond_mask

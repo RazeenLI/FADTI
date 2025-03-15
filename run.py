@@ -1,4 +1,4 @@
-# python run.py --model "csdi" --data "physio" --nsample 100 --device "cuda:6"
+# python run.py --model "ftcsdi" --data "physio" --nsample 100 --device "cuda:6"
 import argparse
 import torch
 import datetime
@@ -117,6 +117,7 @@ elif args.model == "ftcsdi":
     from model.fourier_t_csdi.model import FTCSDI
     config_diff = config["diffusion"]
     model = FTCSDI(
+
             data_name=args.data,
             num_features=config["data"]["num_features"],
             num_steps=config["data"]["num_steps"],

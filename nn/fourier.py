@@ -65,18 +65,14 @@ class FBMLinear(nn.Module):
             self,
             x
     ):
-        # print(f"\n\n\n\n============= x.type = {x.dtype} =============\n\n\n\n")
         norm = x.size()[-1]
         frequency = torch.fft.rfft(x, axis=-1)
         x = frequency/(norm)*2
         basis_cos=torch.einsum('bkp,pt->bkpt', x.real, self.cos)
         basis_sin=torch.einsum('bkp,pt->bkpt', x.imag, self.sin)
-        # print(f"\n\n\n\n============= basis_sin.type = {basis_sin.dtype} =============\n\n\n\n")
-        # print(f"\n\n\n\n============= self.sin.type = {self.sin.dtype} =============\n\n\n\n")
 
         x = basis_cos + basis_sin
         x = self.flatten_layer(x)
-        # print(f"\n\n\n\n============= x.type = {x.dtype} =============\n\n\n\n")
         x = self.linear_layer(x)
         
         return x
@@ -159,11 +155,8 @@ class FourierBasisMapping(nn.Module):
             self,
             x,
     ):
-        # print(f"\n\n\n\n============= x.type = {x.dtype} =============\n\n\n\n")
         res, trend = self.decomposer_layer(x)
-        # print(f"\n\n\n\n============= res.type = {res.dtype} =============\n\n\n\n")
         res, trend = res.permute(0, 2, 1), trend.permute(0, 2, 1)
-        # print(f"\n\n\n\n============= res.type = {res.dtype} =============\n\n\n\n")
         res = self.res_fbm_layer(res)
         trend = self.trend_fbm_layer(trend)
         x = res + trend

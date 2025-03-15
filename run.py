@@ -48,15 +48,8 @@ config = {**config_model, **config_data}
 
 print(json.dumps(config, indent=4))
 
-# Create Save Place
-current_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-foldername = "./save/" + args.model + "_" + args.data + str(config["data"]["nfold"]) + "_" + current_time + "/"
-print('model folder:', foldername)
-os.makedirs(foldername, exist_ok=True)
-with open(foldername + "config.json", "w") as f:
-    json.dump(config, f, indent=4)
-
 # Load Data
+data_info = "None"
 if args.data == "physio":
     from dataset.physio import get_dataloader
     train_loader, valid_loader, test_loader = get_dataloader(
@@ -65,13 +58,24 @@ if args.data == "physio":
         batch_size=config["train"]["batch_size"],
         missing_ratio=config["data"]["test_missing_ratio"],
     )
+    data_info = str(config["data"]["nfold"])
+elif args.data == "metrla":
+    from dataset.metrla import get_dataloader 
+    train_loader, valid_loader, test_loader, scaler, mean_scaler = get_dataloader(
+        batch_size=config["train"]["batch_size"], 
+        device=args.device, 
+        missing_pattern=config["data"]["missing_pattern"],
+        num_workers=config["data"]["num_workers"],
+    )
+    data_info = config["data"]["missing_pattern"]
 
 # Load Model
 if args.model == "csdi":
     from model.csdi.model import CSDI
     config_diff = config["diffusion"]
     model = CSDI(
-            num_features=35,
+            data_name=args.data,
+            num_features=config["data"]["num_features"],
             num_layers=config_diff["layers"],
             num_heads=config_diff["nheads"],
             num_channels=config_diff["channels"],
@@ -113,12 +117,14 @@ elif args.model == "ftcsdi":
     from model.fourier_t_csdi.model import FTCSDI
     config_diff = config["diffusion"]
     model = FTCSDI(
-            num_features=35,
+
+            data_name=args.data,
+            num_features=config["data"]["num_features"],
+            num_steps=config["data"]["num_steps"],
             num_layers=config_diff["layers"],
             num_heads=config_diff["nheads"],
             num_channels=config_diff["channels"],
             num_diffusion_steps=config_diff["num_steps"],
-            num_steps=48,
             dim_time_embedding=config["model"]["timeemb"],
             dim_feature_embedding=config["model"]["featureemb"],
             dim_diffusion_embedding=config_diff["diffusion_embedding_dim"],
@@ -136,6 +142,14 @@ model_process = Process(
         epochs=config["train"]["epochs"],
         device=args.device,            
 )
+
+# Create Save Place
+current_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+foldername = "./save/" + args.model + "_" + args.data + data_info + "_" + current_time + "/"
+print('model folder:', foldername)
+os.makedirs(foldername, exist_ok=True)
+with open(foldername + "config.json", "w") as f:
+    json.dump(config, f, indent=4)
 
 # train new model or load old model
 if args.modelfolder == "":

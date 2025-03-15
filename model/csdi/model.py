@@ -3,10 +3,12 @@ import torch
 import torch.nn as nn
 
 from .layers import DiffusionCSDI
+from nn.process_data import get_process_data
 
 class CSDI(nn.Module):
     def __init__(
             self,
+            data_name,
             num_features,
             num_layers,
             num_heads,
@@ -24,6 +26,8 @@ class CSDI(nn.Module):
     ):
         super().__init__()
         self.device = device
+
+        self.process_data = get_process_data(data_name)
 
         # self.dim_target = dim_target # target embedding dim
         self.dim_time_embedding = dim_time_embedding # time embedding dim
@@ -236,20 +240,24 @@ class CSDI(nn.Module):
         results = {}
         if self.training:
             # Training
-            # (observed_data, observed_mask, conditional_mask, observed_tp) = (
-            #     inputs["X_ori"],
-            #     inputs["observed_mask"],
-            #     inputs["cond_mask"],
-            #     inputs["observed_tp"],
-            # )
+
+
+            res = self.process_data(inputs, self.device)
+
             (
                 observed_data,
                 observed_mask,
                 observed_tp,
                 gt_mask,
-                for_pattern_mask,
-                _,
-            ) = self.process_data(inputs)
+                # for_pattern_mask,
+            ) = (
+                res["observed_data"],
+                res["observed_mask"],
+                res["observed_tp"],
+                res["gt_mask"],
+                # res["for_pattern_mask"],
+            )
+
             conditional_mask = self.get_randmask(observed_mask)
             side_info = self.get_side_info(observed_tp, conditional_mask)
 
@@ -269,14 +277,22 @@ class CSDI(nn.Module):
             #     inputs["cond_mask"],
             #     inputs["observed_tp"],
             # )
+            res = self.process_data(inputs, self.device)
+
             (
                 observed_data,
                 observed_mask,
                 observed_tp,
                 gt_mask,
-                for_pattern_mask,
-                _,
-            ) = self.process_data(inputs)
+                # for_pattern_mask,
+            ) = (
+                res["observed_data"],
+                res["observed_mask"],
+                res["observed_tp"],
+                res["gt_mask"],
+                # res["for_pattern_mask"],
+            )
+
             conditional_mask = gt_mask
 
             side_info = self.get_side_info(observed_tp, conditional_mask)
@@ -300,14 +316,21 @@ class CSDI(nn.Module):
         #         inputs["cond_mask"],
         #         inputs["observed_tp"],
         # )
+        res = self.process_data(inputs, self.device)
+
         (
             observed_data,
             observed_mask,
             observed_tp,
             gt_mask,
-            _,
             cut_length,
-        ) = self.process_data(inputs)
+        ) = (
+            res["observed_data"],
+            res["observed_mask"],
+            res["observed_tp"],
+            res["gt_mask"],
+            res["cut_length"],
+        )
 
         with torch.no_grad():
             cond_mask = gt_mask
@@ -333,28 +356,6 @@ class CSDI(nn.Module):
         # imputed_data = repeated_observation + samples * (1 - repeated_mask)
 
         # results["imputed_data"] = imputed_data.permute(0, 1, 3, 2)  # (batch_size, num_sampling_times, num_steps, num_features)
-
-    def process_data(self, batch):
-        observed_data = batch["observed_data"].to(self.device).float()
-        observed_mask = batch["observed_mask"].to(self.device).float()
-        observed_tp = batch["timepoints"].to(self.device).float()
-        gt_mask = batch["gt_mask"].to(self.device).float()
-
-        observed_data = observed_data.permute(0, 2, 1)
-        observed_mask = observed_mask.permute(0, 2, 1)
-        gt_mask = gt_mask.permute(0, 2, 1)
-
-        cut_length = torch.zeros(len(observed_data)).long().to(self.device)
-        for_pattern_mask = observed_mask
-
-        return (
-            observed_data,
-            observed_mask,
-            observed_tp,
-            gt_mask,
-            for_pattern_mask,
-            cut_length,
-        )
     
     def get_randmask(self, observed_mask):
         rand_for_mask = torch.rand_like(observed_mask) * observed_mask

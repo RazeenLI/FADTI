@@ -120,6 +120,7 @@ class TemporalAttention(nn.Module):
 
     def forward(self, x, base_shape, itp_x=None):
         batch_size, num_channels, num_features, num_steps = base_shape
+        
         if num_steps == 1:
             return x
         # Time Domain

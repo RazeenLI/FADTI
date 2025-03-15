@@ -2,3 +2,11 @@ data:
   nfold: 0 # for 5fold test (valid value:[0-4])
   test_missing_ratio: 0.1
   seed: 1
+  num_steps: 48
+  num_features: 35
+
+train:
+  epochs: 200
+  batch_size: 16 
+  lr: 1.0e-3
+  itr_per_epoch: 1.0e+8

@@ -1,0 +1,11 @@
+data:
+  num_workers: 16
+  missing_pattern: "block"
+  num_steps: 24
+  num_features: 207
+
+train:
+  epochs: 2
+  batch_size: 4
+  lr: 1.0e-3
+  itr_per_epoch: 1.0e+8

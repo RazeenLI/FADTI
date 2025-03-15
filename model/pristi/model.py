@@ -23,7 +23,8 @@ class PriSTI(nn.Module):
             device,
             proj_t, 
             is_cross_t,
-            is_cross_s
+            is_cross_s,
+            use_guide,
     ):
         super().__init__()
         self.device = device
@@ -34,7 +35,7 @@ class PriSTI(nn.Module):
         
         self.is_unconditional = is_unconditional
         self.target_strategy = target_strategy
-        self.use_guide = None
+        self.use_guide = use_guide
 
         self.num_features = num_features
         self.num_channels = num_channels
@@ -194,6 +195,7 @@ class PriSTI(nn.Module):
         conditional_mask, 
         observed_mask, 
         side_info,
+        itp_info
     ):
         loss_sum = 0
         for step in range(self.num_diffusion_steps):  # calculate loss for all t
@@ -202,6 +204,7 @@ class PriSTI(nn.Module):
                 conditional_mask, 
                 observed_mask, 
                 side_info, 
+                itp_info,
                 set_step=step
             )
             loss_sum += loss.detach()
@@ -213,6 +216,7 @@ class PriSTI(nn.Module):
         conditional_mask, 
         observed_mask, 
         side_info, 
+        itp_info,
         set_step=-1
     ):
         batch_size, num_features, num_steps = observed_data.shape
@@ -231,7 +235,7 @@ class PriSTI(nn.Module):
 
         total_input = self.set_input_to_diffusion_model(noisy_data, observed_data, conditional_mask) # (batch_size, 2|1, num_features, num_steps)
 
-        predicted = self.diffussion_model(total_input, side_info, step)  # (batch_size, num_features, num_steps)
+        predicted = self.diffussion_model(total_input, side_info, step, itp_info)  # (batch_size, num_features, num_steps)
 
         target_mask = observed_mask - conditional_mask
         residual = (noise - predicted) * target_mask
@@ -263,6 +267,10 @@ class PriSTI(nn.Module):
             ) = self.process_data(inputs)
             conditional_mask = self.get_randmask(observed_mask)
             side_info = self.get_side_info(observed_tp, conditional_mask)
+            itp_info = None
+            # if self.use_guide:
+            #     itp_info = coeffs.unsqueeze(1)
+
 
             # training loss
             results["loss"] = self.calc_loss(
@@ -270,6 +278,7 @@ class PriSTI(nn.Module):
                 conditional_mask=conditional_mask, 
                 observed_mask=observed_mask, 
                 side_info=side_info, 
+                itp_info=itp_info,
             )
             
         elif not self.training:
@@ -297,6 +306,7 @@ class PriSTI(nn.Module):
                 conditional_mask=conditional_mask, 
                 observed_mask=observed_mask, 
                 side_info=side_info, 
+                itp_info=None
             )
         return results["loss"]
     

@@ -1,10 +1,11 @@
 import copy
 import numpy as np
 # import scipy.sparse as sp
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
-from generate_adj import *
+# from generate_adj import *
 
 # # in Graph-wavenet
 # def asym_adj(adj):
@@ -269,10 +270,10 @@ class SpaDependLearning(nn.Module):
         )
 
         self.feature_layer = SpatialAttention(
-            dim=num_channels, 
-            seq_len=dim_target, 
+            num_channels=num_channels, 
+            dim_target=dim_target, 
             k=proj_t, 
-            heads=num_heads
+            num_heads=num_heads
         )
         self.cond_proj = conv1d_with_init(2 * num_channels, num_channels, 1)
         self.norm1_local = nn.GroupNorm(4, num_channels)

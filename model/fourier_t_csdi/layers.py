@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from nn.transformer import TransformerEncoder_QKV, TransformerEncoderLayer_QKV
+from nn.fourier import FourierBasisMapping
 
 def get_transformer(num_heads=8, num_layers=1, num_channels=64):
     encoder_layer = TransformerEncoderLayer_QKV(
@@ -96,8 +97,11 @@ class TemporalAttention(nn.Module):
             self, 
             num_channels, 
             num_heads, 
+            num_steps,
             num_layers=1,
-            is_cross=False
+            is_cross=False,
+            init_cutoff_ratio=0.5,
+            apply_ifft=True,
         ):
         super().__init__()
         self.is_cross = is_cross
@@ -106,21 +110,119 @@ class TemporalAttention(nn.Module):
             num_layers=num_layers, 
             num_channels=num_channels
         )
+        self.fft_layer = FourierBasisMapping(
+            context_window=num_steps,
+            target_window=num_steps,
+        )
+        self.fusion_layer = nn.Linear(num_channels * 2, num_channels)
+        self.norm = nn.LayerNorm(num_channels)  # 针对每个时间步内的 channel 归一化
+
 
     def forward(self, x, base_shape, itp_x=None):
         batch_size, num_channels, num_features, num_steps = base_shape
+        # print(f"\n\n\n\n============= x.shape = {base_shape} =============\n\n\n\n")
         if num_steps == 1:
             return x
-        # v self imformation, q other information
+        # Time Domain
         v = x.reshape(batch_size, num_channels, num_features, num_steps).permute(0, 2, 1, 3).reshape(batch_size * num_features, num_channels, num_steps).permute(2, 0, 1)
-        if self.is_cross:
-            q = itp_x.reshape(batch_size, num_channels, num_features, num_steps).permute(0, 2, 1, 3).reshape(batch_size * num_features, num_channels, num_steps).permute(2, 0, 1)
-            x = self.time_layer(q, v, v).permute(1, 2, 0) # self.time_layer(q, q, v).permute(1, 2, 0)
-        else:
-            x = self.time_layer(v, v, v).permute(1, 2, 0)
+        # Frequenct Domain
+        v_fft = x.reshape(batch_size, num_channels, num_features, num_steps).permute(0, 2, 1, 3).reshape(batch_size * num_features, num_channels, num_steps).permute(0, 2, 1)
+        v_fft = self.fft_layer(v_fft)
+        v_fft = v_fft.permute(1, 0, 2)
+        # v self imformation, q other information
+        # combine
+        # 简单平均融合（也可以采用加权或拼接后再映射 cat -> linear 的方式）
+        # v = (v + x_fft) / 2
+        # 加权
+        # weights = torch.softmax(torch.stack([self.alpha, self.beta]), dim=0)
+        # v = weights[0] * v + weights[1] * x_fft
+        # 拼接后再映射 cat -> linear
+        v = torch.cat([v, v_fft], dim=-1)
+        v = self.fusion_layer(v)
+        # v = v_fft
+
+        # if self.is_cross:
+        #     q = itp_x.reshape(batch_size, num_channels, num_features, num_steps).permute(0, 2, 1, 3).reshape(batch_size * num_features, num_channels, num_steps).permute(2, 0, 1)
+        #     x = self.time_layer(q, v, v).permute(1, 2, 0)
+        # else:
+        #     x = self.time_layer(v, v, v).permute(1, 2, 0)
+        x = v.permute(1, 2, 0)
 
         x = x.reshape(batch_size, num_features, num_channels, num_steps).permute(0, 2, 1, 3).reshape(batch_size, num_channels, num_features * num_steps)
         return x
+    
+
+# class TemporalAttention(nn.Module):
+#     def __init__(
+#             self, 
+#             num_channels, 
+#             num_heads, 
+#             num_layers=1,
+#             is_cross=False,
+#             init_cutoff_ratio=0.5,
+#             apply_ifft=True,
+#         ):
+#         super().__init__()
+#         self.is_cross = is_cross
+#         self.time_layer = get_transformer(
+#             num_heads=num_heads, 
+#             num_layers=num_layers, 
+#             num_channels=num_channels
+#         )
+#         self.fft_linear_layer = nn.Linear(num_channels * 2, num_channels)
+#         self.fusion_layer = nn.Linear(num_channels * 2, num_channels)
+#         # # 可学习的融合权重参数（初始值可以设为 0.5）
+#         # self.alpha = nn.Parameter(torch.tensor(0.5))
+#         # self.beta = nn.Parameter(torch.tensor(0.5))
+#         self.norm = nn.LayerNorm(num_channels)  # 针对每个时间步内的 channel 归一化
+
+#     def fft(self, x, base_shape):
+#         batch_size, num_channels, num_features, num_steps = base_shape
+#         # 将 x reshape 成 (batch_size, num_channels, num_features, num_steps)
+#         x = x.reshape(batch_size, num_channels, num_features, num_steps)
+#         # 沿着时间维度做 FFT，返回的是复数张量
+#         x_fft = torch.fft.fft(x, dim=-1)
+
+
+#         # 提取实部和虚部并拼接
+#         x_fft = torch.cat([x_fft.real, x_fft.imag], dim=1)  # (batch_size, 2*num_channels, num_features, num_steps)
+#         # 根据需要再 reshape 成 (batch_size, new_channels, num_features * num_steps)
+#         x = x_fft.permute(0, 2, 1, 3).reshape(batch_size * num_features, 2*num_channels, num_steps)
+#         x = x.permute(2, 0, 1) # (num_steps, batch_size*num_features, 2*num_channels)
+#         # 通过线性层映射回 num_channels
+#         x = self.fft_linear_layer(x)  # (num_steps, batch_size*num_features, num_channels)
+
+#         # 应用 LayerNorm
+#         x = self.norm(x)
+#         return x
+
+#     def forward(self, x, base_shape, itp_x=None):
+#         batch_size, num_channels, num_features, num_steps = base_shape
+#         if num_steps == 1:
+#             return x
+#         # Time Domain
+#         v = x.reshape(batch_size, num_channels, num_features, num_steps).permute(0, 2, 1, 3).reshape(batch_size * num_features, num_channels, num_steps).permute(2, 0, 1)
+#         # Frequenct Domain
+#         x_fft = self.fft(x, base_shape)
+#         # v self imformation, q other information
+#         # combine
+#         # 简单平均融合（也可以采用加权或拼接后再映射 cat -> linear 的方式）
+#         # v = (v + x_fft) / 2
+#         # 加权
+#         # weights = torch.softmax(torch.stack([self.alpha, self.beta]), dim=0)
+#         # v = weights[0] * v + weights[1] * x_fft
+#         # 拼接后再映射 cat -> linear
+#         v = torch.cat([v, x_fft], dim=-1)
+#         v = self.fusion_layer(v)
+
+#         if self.is_cross:
+#             q = itp_x.reshape(batch_size, num_channels, num_features, num_steps).permute(0, 2, 1, 3).reshape(batch_size * num_features, num_channels, num_steps).permute(2, 0, 1)
+#             x = self.time_layer(q, v, v).permute(1, 2, 0)
+#         else:
+#             x = self.time_layer(v, v, v).permute(1, 2, 0)
+
+#         x = x.reshape(batch_size, num_features, num_channels, num_steps).permute(0, 2, 1, 3).reshape(batch_size, num_channels, num_features * num_steps)
+#         return x
 
 class FeatureAttention(nn.Module):
     def __init__(
@@ -157,7 +259,8 @@ class ResidualBlock(nn.Module):
             dim_diffusion_embedding,
             dim_side,
             num_channels,
-            num_heads
+            num_heads,
+            num_steps,
     ):
         super().__init__()
         self.diffusion_projection_layer = nn.Linear(dim_diffusion_embedding, num_channels)
@@ -168,10 +271,12 @@ class ResidualBlock(nn.Module):
         self.middle_projection_layer = conv1d_with_init(num_channels, 2 * num_channels, 1)
         self.output_projection_layer = conv1d_with_init(num_channels, 2 * num_channels, 1)
 
+        # change part 1
         self.time_layer = TemporalAttention(
             num_heads=num_heads,
             num_layers=1,
-            num_channels=num_channels
+            num_channels=num_channels,
+            num_steps=num_steps,
         )
         self.feature_layer = FeatureAttention(
             num_heads=num_heads,
@@ -232,7 +337,7 @@ class ResidualBlock(nn.Module):
         return (x + residual) / math.sqrt(2.0), skip
 
 
-class DiffusionCSDI(nn.Module):
+class DiffusionFTCSDI(nn.Module):
     def __init__(
             self,
             num_diffusion_steps,
@@ -242,6 +347,7 @@ class DiffusionCSDI(nn.Module):
             num_channels,
             num_heads,
             num_layers,
+            num_steps,
     ):
         super().__init__()
 
@@ -265,7 +371,8 @@ class DiffusionCSDI(nn.Module):
                     dim_diffusion_embedding=dim_diffusion_embedding,
                     dim_side=dim_side,
                     num_channels=num_channels,
-                    num_heads=num_heads
+                    num_heads=num_heads,
+                    num_steps=num_steps,
                 )
                 for _ in range(num_layers)
             ]

@@ -2,16 +2,19 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from .layers import DiffusionPriSTI
+from .layers import DiffusionFTCSDI
+from nn.process_data import get_process_data
 
-class PriSTI(nn.Module):
+class FTCSDI(nn.Module):
     def __init__(
             self,
+            data_name,
             num_features,
             num_layers,
             num_heads,
             num_channels,
             num_diffusion_steps,
+            num_steps,
             dim_time_embedding,
             dim_feature_embedding,
             dim_diffusion_embedding,
@@ -21,22 +24,17 @@ class PriSTI(nn.Module):
             beta_end,
             target_strategy,
             device,
-            proj_t, 
-            is_cross_t,
-            is_cross_s,
-            use_guide,
     ):
         super().__init__()
         self.device = device
+
+        self.process_data = get_process_data(data_name)
 
         # self.dim_target = dim_target # target embedding dim
         self.dim_time_embedding = dim_time_embedding # time embedding dim
         self.dim_feature_embedding = dim_feature_embedding # feature embedding dim
         
         self.is_unconditional = is_unconditional
-        self.target_strategy = target_strategy
-        self.use_guide = use_guide
-
         self.num_features = num_features
         self.num_channels = num_channels
         self.num_diffusion_steps = num_diffusion_steps
@@ -56,8 +54,7 @@ class PriSTI(nn.Module):
             embedding_dim=dim_feature_embedding,
         )
 
-        self.diffussion_model = DiffusionPriSTI(
-            device=device,
+        self.diffussion_model = DiffusionFTCSDI(
             num_diffusion_steps=num_diffusion_steps,
             dim_diffusion_embedding=dim_diffusion_embedding,
             dim_input=dim_input,
@@ -65,10 +62,7 @@ class PriSTI(nn.Module):
             num_channels=num_channels,
             num_heads=num_heads,
             num_layers=num_layers,
-            num_features=num_features,
-            proj_t=proj_t, 
-            is_cross_t=is_cross_t,
-            is_cross_s=is_cross_s,
+            num_steps=num_steps,
         )
 
         # Noise Paremeters for diffusion model
@@ -195,7 +189,6 @@ class PriSTI(nn.Module):
         conditional_mask, 
         observed_mask, 
         side_info,
-        itp_info
     ):
         loss_sum = 0
         for step in range(self.num_diffusion_steps):  # calculate loss for all t
@@ -204,7 +197,6 @@ class PriSTI(nn.Module):
                 conditional_mask, 
                 observed_mask, 
                 side_info, 
-                itp_info,
                 set_step=step
             )
             loss_sum += loss.detach()
@@ -216,7 +208,6 @@ class PriSTI(nn.Module):
         conditional_mask, 
         observed_mask, 
         side_info, 
-        itp_info,
         set_step=-1
     ):
         batch_size, num_features, num_steps = observed_data.shape
@@ -235,7 +226,7 @@ class PriSTI(nn.Module):
 
         total_input = self.set_input_to_diffusion_model(noisy_data, observed_data, conditional_mask) # (batch_size, 2|1, num_features, num_steps)
 
-        predicted = self.diffussion_model(total_input, side_info, step, itp_info)  # (batch_size, num_features, num_steps)
+        predicted = self.diffussion_model(total_input, side_info, step)  # (batch_size, num_features, num_steps)
 
         target_mask = observed_mask - conditional_mask
         residual = (noise - predicted) * target_mask
@@ -257,20 +248,24 @@ class PriSTI(nn.Module):
             #     inputs["cond_mask"],
             #     inputs["observed_tp"],
             # )
+            res = self.process_data(inputs, self.device)
+
             (
                 observed_data,
                 observed_mask,
                 observed_tp,
                 gt_mask,
-                for_pattern_mask,
-                _,
-            ) = self.process_data(inputs)
+                # for_pattern_mask,
+            ) = (
+                res["observed_data"],
+                res["observed_mask"],
+                res["observed_tp"],
+                res["gt_mask"],
+                # res["for_pattern_mask"],
+            )
+
             conditional_mask = self.get_randmask(observed_mask)
             side_info = self.get_side_info(observed_tp, conditional_mask)
-            itp_info = None
-            # if self.use_guide:
-            #     itp_info = coeffs.unsqueeze(1)
-
 
             # training loss
             results["loss"] = self.calc_loss(
@@ -278,25 +273,26 @@ class PriSTI(nn.Module):
                 conditional_mask=conditional_mask, 
                 observed_mask=observed_mask, 
                 side_info=side_info, 
-                itp_info=itp_info,
             )
             
         elif not self.training:
             # Validating
-            # (observed_data, observed_mask, conditional_mask, observed_tp) = (
-            #     inputs["X_ori"],
-            #     inputs["observed_mask"],
-            #     inputs["cond_mask"],
-            #     inputs["observed_tp"],
-            # )
+            res = self.process_data(inputs, self.device)
+
             (
                 observed_data,
                 observed_mask,
                 observed_tp,
                 gt_mask,
-                for_pattern_mask,
-                _,
-            ) = self.process_data(inputs)
+                # for_pattern_mask,
+            ) = (
+                res["observed_data"],
+                res["observed_mask"],
+                res["observed_tp"],
+                res["gt_mask"],
+                # res["for_pattern_mask"],
+            )
+
             conditional_mask = gt_mask
 
             side_info = self.get_side_info(observed_tp, conditional_mask)
@@ -306,7 +302,6 @@ class PriSTI(nn.Module):
                 conditional_mask=conditional_mask, 
                 observed_mask=observed_mask, 
                 side_info=side_info, 
-                itp_info=None
             )
         return results["loss"]
     
@@ -315,21 +310,22 @@ class PriSTI(nn.Module):
             inputs,
             num_sampling_times=1,
     ):
-        results = {}
-        # (observed_data, conditional_mask, observed_tp) = (
-        #         inputs["X_ori"],
-        #         inputs["cond_mask"],
-        #         inputs["observed_tp"],
-        # )
+        # results = {}
+        res = self.process_data(inputs, self.device)
+
         (
             observed_data,
             observed_mask,
             observed_tp,
             gt_mask,
-            _,
             cut_length,
-        ) = self.process_data(inputs)
-
+        ) = (
+            res["observed_data"],
+            res["observed_mask"],
+            res["observed_tp"],
+            res["gt_mask"],
+            res["cut_length"],
+        )
         with torch.no_grad():
             cond_mask = gt_mask
             target_mask = observed_mask - cond_mask
@@ -354,28 +350,6 @@ class PriSTI(nn.Module):
         # imputed_data = repeated_observation + samples * (1 - repeated_mask)
 
         # results["imputed_data"] = imputed_data.permute(0, 1, 3, 2)  # (batch_size, num_sampling_times, num_steps, num_features)
-
-    def process_data(self, batch):
-        observed_data = batch["observed_data"].to(self.device).float()
-        observed_mask = batch["observed_mask"].to(self.device).float()
-        observed_tp = batch["timepoints"].to(self.device).float()
-        gt_mask = batch["gt_mask"].to(self.device).float()
-
-        observed_data = observed_data.permute(0, 2, 1)
-        observed_mask = observed_mask.permute(0, 2, 1)
-        gt_mask = gt_mask.permute(0, 2, 1)
-
-        cut_length = torch.zeros(len(observed_data)).long().to(self.device)
-        for_pattern_mask = observed_mask
-
-        return (
-            observed_data,
-            observed_mask,
-            observed_tp,
-            gt_mask,
-            for_pattern_mask,
-            cut_length,
-        )
     
     def get_randmask(self, observed_mask):
         rand_for_mask = torch.rand_like(observed_mask) * observed_mask

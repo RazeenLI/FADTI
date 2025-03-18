@@ -55,14 +55,15 @@ if args.data == "physio":
     train_loader, valid_loader, test_loader = get_dataloader(
         seed=config["data"]["seed"],
         nfold=config["data"]["nfold"],
-        batch_size=config["train"]["batch_size"],
+        batch_size=config["data"]["batch_size"],
         missing_ratio=config["data"]["test_missing_ratio"],
+        missing_pattern='block',
     )
     data_info = str(config["data"]["nfold"])
 elif args.data == "metrla":
     from dataset.metrla import get_dataloader 
     train_loader, valid_loader, test_loader, scaler, mean_scaler = get_dataloader(
-        batch_size=config["train"]["batch_size"], 
+        batch_size=config["data"]["batch_size"], 
         device=args.device, 
         missing_pattern=config["data"]["missing_pattern"],
         num_workers=config["data"]["num_workers"],
@@ -140,6 +141,7 @@ model_process = Process(
         model=model,
         learning_rate=config["train"]["lr"],
         epochs=config["train"]["epochs"],
+        save_strategy=config["train"]["save_strategy"],
         device=args.device,            
 )
 

@@ -14,6 +14,7 @@ class Process(object):
             epochs: int = 100,
             batch_size: int = 32,
             patience: Optional[int] = None,
+            save_strategy="new" # "new", "best", "none", "all"
         ):
         super().__init__()
         self.device = device
@@ -22,6 +23,7 @@ class Process(object):
         self.patience = patience
 
         self.saving_path = None
+        self.save_strategy = save_strategy
 
         # set up model
         self.model = model.to(self.device)
@@ -72,7 +74,6 @@ class Process(object):
             if valid_loader is not None and (epoch + 1) % valid_epoch_interval == 0:
                 self.model.eval()
                 avg_loss_valid = 0
-                val_loss_collector = []
                 with torch.no_grad():
                     with tqdm(valid_loader, mininterval=5.0, maxinterval=50.0) as it:
                         for batch_index, valid_batch in enumerate(it, start=1):
@@ -86,17 +87,33 @@ class Process(object):
                                 },
                                 refresh=False,
                             )
-                if best_valid_loss > np.mean(val_loss_collector):
-                    best_valid_loss = avg_loss_valid
-                    print(
-                        "\n best loss is updated to ",
-                        avg_loss_valid / batch_index,
-                        "at",
-                        epoch,
-                    )
+                best_valid_loss = self.save_model(output_path, avg_loss_valid / batch_index, best_valid_loss, epoch)
 
-        if foldername != "":
+        if self.save_strategy == "new":
+            best_valid_loss = self.save_model(output_path, best_valid_loss, best_valid_loss, self.epochs)
             torch.save(self.model.state_dict(), output_path)
+    
+
+    def save_model(self, save_path, current_valid_loss, best_valid_loss, epoch):
+        # 根据保存策略判断是否保存模型
+        if self.save_strategy == "best":
+            if current_valid_loss < best_valid_loss:
+                best_valid_loss = current_valid_loss
+                print("\nBest loss updated to", best_valid_loss, "at epoch", epoch)
+                torch.save(self.model.state_dict(), save_path)
+        elif self.save_strategy == "new":
+            print("\nSaving new model at epoch", epoch)
+            torch.save(self.model.state_dict(), save_path)
+        elif self.save_strategy == "all":
+            # 每个 epoch 保存一个不同的文件，可以在文件名中加入 epoch 信息
+            epoch_output_path = save_path + f"_epoch_{epoch}"
+            print("\nSaving model for epoch", epoch)
+            torch.save(self.model.state_dict(), epoch_output_path)
+        else:
+            # 什么也不保存
+            pass
+        return best_valid_loss
+
 
     def evaluate(
             self,

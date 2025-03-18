@@ -17,3 +17,9 @@ model:
   timeemb: 128
   featureemb: 16
   target_strategy: "random"
+
+train:
+  epochs: 200
+  lr: 1.0e-3
+  itr_per_epoch: 1.0e+8
+  save_strategy: "new"

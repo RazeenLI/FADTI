@@ -2,7 +2,7 @@ data:
   nfold: 0 # for 5fold test (valid value:[0-4])
   test_missing_ratio: 0.1
   seed: 1
-  num_steps: 48
-  num_features: 35
-  batch_size: 16
-  missing_pattern: 'point' 
+  num_steps: 24
+  num_features: 7
+  batch_size: 16 
+  missing_pattern: 'point'

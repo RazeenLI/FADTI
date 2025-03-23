@@ -127,6 +127,7 @@ class Process(object):
             self.model.eval()
             mse_total = 0
             mae_total = 0
+            mape_total = 0
             evalpoints_total = 0
 
             all_target = []
@@ -139,6 +140,7 @@ class Process(object):
                     output = self.model.evaluate(batch_data, nsample)
 
                     samples, c_target, eval_points, observed_points, observed_time = output
+                    
                     samples = samples.permute(0, 1, 3, 2)  # (B,nsample,L,K)
                     c_target = c_target.permute(0, 2, 1)  # (B,L,K)
                     eval_points = eval_points.permute(0, 2, 1)
@@ -151,21 +153,30 @@ class Process(object):
                     all_observed_time.append(observed_time)
                     all_generated_samples.append(samples)
 
-                    mse_current = (
-                        ((samples_median.values - c_target) * eval_points) ** 2
-                    ) * (scaler ** 2)
-                    mae_current = (
-                        torch.abs((samples_median.values - c_target) * eval_points) 
-                    ) * scaler
+                    error = (samples_median.values - c_target) * eval_points
+                    error_scaled = error * scaler
+
+                    mse_current = (error_scaled ** 2)
+                    mae_current = torch.abs(error_scaled)
+                    mape_current = torch.abs(error_scaled / (c_target * scaler + 1e-8)) * eval_points
+
+                    # mse_current = (
+                    #     ((samples_median.values - c_target) * eval_points) ** 2
+                    # ) * (scaler ** 2)
+                    # mae_current = (
+                    #     torch.abs((samples_median.values - c_target) * eval_points) 
+                    # ) * scaler
 
                     mse_total += mse_current.sum().item()
                     mae_total += mae_current.sum().item()
+                    mape_total += mape_current.sum().item()
                     evalpoints_total += eval_points.sum().item()
 
                     it.set_postfix(
                         ordered_dict={
                             "rmse_total": np.sqrt(mse_total / evalpoints_total),
                             "mae_total": mae_total / evalpoints_total,
+                            "mape_current": mape_total / evalpoints_total,
                             "batch_no": batch_index,
                         },
                         refresh=True,
@@ -207,12 +218,14 @@ class Process(object):
                         [
                             np.sqrt(mse_total / evalpoints_total),
                             mae_total / evalpoints_total,
+                            mape_total / evalpoints_total,
                             CRPS,
                         ],
                         f,
                     )
                     print("RMSE:", np.sqrt(mse_total / evalpoints_total))
                     print("MAE:", mae_total / evalpoints_total)
+                    print("MAPE:", mape_total / evalpoints_total)
                     print("CRPS:", CRPS)
                     print("CRPS_sum:", CRPS_sum)
 

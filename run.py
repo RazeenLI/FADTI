@@ -57,9 +57,19 @@ if args.data == "physio":
         nfold=config["data"]["nfold"],
         batch_size=config["data"]["batch_size"],
         missing_ratio=config["data"]["test_missing_ratio"],
-        missing_pattern='block',
+        missing_pattern=config["data"]["missing_pattern"],
     )
-    data_info = str(config["data"]["nfold"])
+    data_info = config["data"]["missing_pattern"] + "_" + str(config["data"]["test_missing_ratio"])
+elif args.data == "ett":
+    from dataset.ett import get_dataloader
+    train_loader, valid_loader, test_loader = get_dataloader(
+        seed=config["data"]["seed"],
+        nfold=config["data"]["nfold"],
+        batch_size=config["data"]["batch_size"],
+        missing_ratio=config["data"]["test_missing_ratio"],
+        missing_pattern=config["data"]["missing_pattern"],
+    )
+    data_info = config["data"]["missing_pattern"] + "_" + str(config["data"]["test_missing_ratio"])
 elif args.data == "metrla":
     from dataset.metrla import get_dataloader 
     train_loader, valid_loader, test_loader, scaler, mean_scaler = get_dataloader(
@@ -75,6 +85,26 @@ if args.model == "csdi":
     from model.csdi.model import CSDI
     config_diff = config["diffusion"]
     model = CSDI(
+            data_name=args.data,
+            num_features=config["data"]["num_features"],
+            num_layers=config_diff["layers"],
+            num_heads=config_diff["nheads"],
+            num_channels=config_diff["channels"],
+            num_diffusion_steps=config_diff["num_steps"],
+            dim_time_embedding=config["model"]["timeemb"],
+            dim_feature_embedding=config["model"]["featureemb"],
+            dim_diffusion_embedding=config_diff["diffusion_embedding_dim"],
+            is_unconditional=config["model"]["is_unconditional"],
+            schedule=config_diff["schedule"],
+            beta_start=config_diff["beta_start"],
+            beta_end=config_diff["beta_end"],
+            target_strategy=config["model"]["target_strategy"],
+            device=args.device,
+        )
+elif args.model == "csdi_ori":
+    from model.csdi_ori.model import CSDI_base
+    config_diff = config["diffusion"]
+    model = CSDI_base(
             data_name=args.data,
             num_features=config["data"]["num_features"],
             num_layers=config_diff["layers"],
@@ -147,7 +177,7 @@ model_process = Process(
 
 # Create Save Place
 current_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-foldername = "./save/" + args.model + "_" + args.data + data_info + "_" + current_time + "/"
+foldername = "./save/" + args.model + "_" + args.data + "_" + data_info + "_" + current_time + "/"
 print('model folder:', foldername)
 os.makedirs(foldername, exist_ok=True)
 with open(foldername + "config.json", "w") as f:

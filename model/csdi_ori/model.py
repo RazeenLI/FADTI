@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 
 from .layers import diff_CSDI
+from nn.process_data import get_process_data
 
 class CSDI_base(nn.Module):
     def __init__(
@@ -27,40 +28,54 @@ class CSDI_base(nn.Module):
         ):
         super().__init__()
         self.device = device
+        self.process_data = get_process_data(data_name)
+
         self.target_dim = target_dim
 
-        self.emb_time_dim = dim_time_embedding
-        self.emb_feature_dim = dim_feature_embedding
+        self.emb_time_dim = dim_time_embedding # time embedding dim
+        self.emb_feature_dim = dim_feature_embedding # feature embedding dim
+
         self.is_unconditional = is_unconditional
         self.target_strategy = target_strategy
 
         self.emb_total_dim = self.emb_time_dim + self.emb_feature_dim
         if self.is_unconditional == False:
-            self.emb_total_dim += 1  # for conditional mask
+            dim_side += 1  # for conditional mask
+
         self.embed_layer = nn.Embedding(
             num_embeddings=self.target_dim, embedding_dim=self.emb_feature_dim
         )
 
-        config_diff = config["diffusion"]
-        config_diff["side_dim"] = self.emb_total_dim
-
-        input_dim = 1 if self.is_unconditional == True else 2
-        self.diffmodel = diff_CSDI(config_diff, input_dim)
+        dim_input = 1 if self.is_unconditional == True else 2
+        self.diffmodel = diff_CSDI(
+            num_diffusion_steps=num_diffusion_steps,
+            dim_diffusion_embedding=dim_diffusion_embedding,
+            dim_input=dim_input,
+            dim_side=self.emb_total_dim,
+            num_channels=num_channels,
+            num_heads=num_heads,
+            num_layers=num_layers,
+        )
 
         # parameters for diffusion models
-        self.num_steps = config_diff["num_steps"]
-        if config_diff["schedule"] == "quad":
+        self.num_steps = num_diffusion_steps
+        if schedule == "quad":
             self.beta = np.linspace(
-                config_diff["beta_start"] ** 0.5, config_diff["beta_end"] ** 0.5, self.num_steps
+                beta_start ** 0.5, beta_end ** 0.5, self.num_steps
             ) ** 2
-        elif config_diff["schedule"] == "linear":
+        elif schedule == "linear":
             self.beta = np.linspace(
-                config_diff["beta_start"], config_diff["beta_end"], self.num_steps
+                beta_start, beta_end, self.num_steps
             )
 
         self.alpha_hat = 1 - self.beta
         self.alpha = np.cumprod(self.alpha_hat)
         self.alpha_torch = torch.tensor(self.alpha).float().to(self.device).unsqueeze(1).unsqueeze(1)
+        # self.register_buffer(
+        #     "alpha_torch", 
+        #     torch.tensor(self.alpha).float().unsqueeze(1).unsqueeze(1)
+        # )
+
 
     def time_embedding(self, pos, d_model=128):
         pe = torch.zeros(pos.shape[0], pos.shape[1], d_model).to(self.device)

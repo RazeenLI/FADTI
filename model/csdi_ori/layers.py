@@ -58,16 +58,25 @@ class DiffusionEmbedding(nn.Module):
 
 
 class diff_CSDI(nn.Module):
-    def __init__(self, config, inputdim=2):
+    def __init__(
+            self, 
+            num_diffusion_steps,
+            dim_diffusion_embedding,
+            dim_input,
+            dim_side,
+            num_channels,
+            num_heads,
+            num_layers,
+        ):
         super().__init__()
-        self.channels = config["channels"]
+        self.channels = num_channels
 
         self.diffusion_embedding = DiffusionEmbedding(
-            num_steps=config["num_steps"],
-            embedding_dim=config["diffusion_embedding_dim"],
+            num_steps=num_diffusion_steps,
+            embedding_dim=dim_diffusion_embedding,
         )
 
-        self.input_projection = Conv1d_with_init(inputdim, self.channels, 1)
+        self.input_projection = Conv1d_with_init(dim_input, self.channels, 1)
         self.output_projection1 = Conv1d_with_init(self.channels, self.channels, 1)
         self.output_projection2 = Conv1d_with_init(self.channels, 1, 1)
         nn.init.zeros_(self.output_projection2.weight)
@@ -75,13 +84,13 @@ class diff_CSDI(nn.Module):
         self.residual_layers = nn.ModuleList(
             [
                 ResidualBlock(
-                    side_dim=config["side_dim"],
+                    side_dim=dim_side,
                     channels=self.channels,
-                    diffusion_embedding_dim=config["diffusion_embedding_dim"],
-                    nheads=config["nheads"],
-                    is_linear=config["is_linear"],
+                    diffusion_embedding_dim=dim_diffusion_embedding,
+                    nheads=num_heads,
+                    is_linear=False,
                 )
-                for _ in range(config["layers"])
+                for _ in range(num_layers)
             ]
         )
 

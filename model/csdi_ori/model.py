@@ -8,8 +8,6 @@ from nn.process_data import get_process_data
 class CSDI_base(nn.Module):
     def __init__(
             self, 
-            target_dim, 
-            config, 
             data_name,
             num_features,
             num_layers,
@@ -30,7 +28,7 @@ class CSDI_base(nn.Module):
         self.device = device
         self.process_data = get_process_data(data_name)
 
-        self.target_dim = target_dim
+        self.target_dim = num_features
 
         self.emb_time_dim = dim_time_embedding # time embedding dim
         self.emb_feature_dim = dim_feature_embedding # feature embedding dim
@@ -40,7 +38,7 @@ class CSDI_base(nn.Module):
 
         self.emb_total_dim = self.emb_time_dim + self.emb_feature_dim
         if self.is_unconditional == False:
-            dim_side += 1  # for conditional mask
+            self.emb_total_dim += 1  # for conditional mask
 
         self.embed_layer = nn.Embedding(
             num_embeddings=self.target_dim, embedding_dim=self.emb_feature_dim
@@ -228,7 +226,7 @@ class CSDI_base(nn.Module):
             gt_mask,
             for_pattern_mask,
             _,
-        ) = self.process_data(batch)
+        ) = self.process_data(batch, self.device)
         if is_train == 0:
             cond_mask = gt_mask
         elif self.target_strategy != "random":
@@ -252,7 +250,7 @@ class CSDI_base(nn.Module):
             gt_mask,
             _,
             cut_length,
-        ) = self.process_data(batch)
+        ) = self.process_data(batch, self.device)
 
         with torch.no_grad():
             cond_mask = gt_mask

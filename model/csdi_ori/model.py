@@ -219,20 +219,36 @@ class CSDI_base(nn.Module):
         return imputed_samples
 
     def forward(self, batch, is_train=1):
+        res = self.process_data(batch, self.device)
+
         (
             observed_data,
             observed_mask,
             observed_tp,
             gt_mask,
-            for_pattern_mask,
-            _,
-        ) = self.process_data(batch, self.device)
+            # for_pattern_mask,
+        ) = (
+            res["observed_data"],
+            res["observed_mask"],
+            res["observed_tp"],
+            res["gt_mask"],
+            # res["for_pattern_mask"],
+        )
+        
+        # (
+        #     observed_data,
+        #     observed_mask,
+        #     observed_tp,
+        #     gt_mask,
+        #     for_pattern_mask,
+        #     _,
+        # ) = self.process_data(batch, self.device)
         if is_train == 0:
             cond_mask = gt_mask
-        elif self.target_strategy != "random":
-            cond_mask = self.get_hist_mask(
-                observed_mask, for_pattern_mask=for_pattern_mask
-            )
+        # elif self.target_strategy != "random":
+        #     cond_mask = self.get_hist_mask(
+        #         observed_mask, for_pattern_mask=for_pattern_mask
+        #     )
         else:
             cond_mask = self.get_randmask(observed_mask)
 
@@ -243,14 +259,29 @@ class CSDI_base(nn.Module):
         return loss_func(observed_data, cond_mask, observed_mask, side_info, is_train)
 
     def evaluate(self, batch, n_samples):
+        res = self.process_data(batch, self.device)
+
         (
             observed_data,
             observed_mask,
             observed_tp,
             gt_mask,
-            _,
             cut_length,
-        ) = self.process_data(batch, self.device)
+        ) = (
+            res["observed_data"],
+            res["observed_mask"],
+            res["observed_tp"],
+            res["gt_mask"],
+            res["cut_length"],
+        )
+        # (
+        #     observed_data,
+        #     observed_mask,
+        #     observed_tp,
+        #     gt_mask,
+        #     _,
+        #     cut_length,
+        # ) = self.process_data(batch, self.device)
 
         with torch.no_grad():
             cond_mask = gt_mask
@@ -264,24 +295,24 @@ class CSDI_base(nn.Module):
                 target_mask[i, ..., 0 : cut_length[i].item()] = 0
         return samples, observed_data, target_mask, observed_mask, observed_tp
     
-    def process_data(self, batch):
-        observed_data = batch["observed_data"].to(self.device).float()
-        observed_mask = batch["observed_mask"].to(self.device).float()
-        observed_tp = batch["timepoints"].to(self.device).float()
-        gt_mask = batch["gt_mask"].to(self.device).float()
+    # def process_data(self, batch):
+    #     observed_data = batch["observed_data"].to(self.device).float()
+    #     observed_mask = batch["observed_mask"].to(self.device).float()
+    #     observed_tp = batch["timepoints"].to(self.device).float()
+    #     gt_mask = batch["gt_mask"].to(self.device).float()
 
-        observed_data = observed_data.permute(0, 2, 1)
-        observed_mask = observed_mask.permute(0, 2, 1)
-        gt_mask = gt_mask.permute(0, 2, 1)
+    #     observed_data = observed_data.permute(0, 2, 1)
+    #     observed_mask = observed_mask.permute(0, 2, 1)
+    #     gt_mask = gt_mask.permute(0, 2, 1)
 
-        cut_length = torch.zeros(len(observed_data)).long().to(self.device)
-        for_pattern_mask = observed_mask
+    #     cut_length = torch.zeros(len(observed_data)).long().to(self.device)
+    #     for_pattern_mask = observed_mask
 
-        return (
-            observed_data,
-            observed_mask,
-            observed_tp,
-            gt_mask,
-            for_pattern_mask,
-            cut_length,
-        )
+    #     return (
+    #         observed_data,
+    #         observed_mask,
+    #         observed_tp,
+    #         gt_mask,
+    #         for_pattern_mask,
+    #         cut_length,
+    #     )

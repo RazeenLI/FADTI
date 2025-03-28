@@ -182,25 +182,6 @@ class ResidualBlock(nn.Module):
             num_channels=num_channels
         )
 
-    # def forward_time(self, y, base_shape):
-    #     batch_size, num_channels, num_features, num_steps = base_shape
-    #     if num_steps == 1:
-    #         return y
-    #     y = y.reshape(batch_size, num_channels, num_features, num_steps).permute(0, 2, 1, 3).reshape(batch_size * num_features, num_channels, num_steps)
-    #     y = self.time_layer(y.permute(2, 0, 1)).permute(1, 2, 0)
-    #     y = y.reshape(batch_size, num_features, num_channels, num_steps).permute(0, 2, 1, 3).reshape(batch_size, num_channels, num_features * num_steps)
-    #     return y
-    
-    # def forward_feature(self, y, base_shape):
-    #     batch_size, num_channels, num_features, num_steps = base_shape
-    #     if num_features == 1:
-    #         return y
-    #     y = y.reshape(batch_size, num_channels, num_features, num_steps).permute(0, 3, 1, 2).reshape(batch_size * num_steps, num_channels, num_features)
-    #     y = self.feature_layer(y.permute(2, 0, 1)).permute(1, 2, 0)
-    #     y = y.reshape(batch_size, num_steps, num_channels, num_features).permute(0, 2, 3, 1).reshape(batch_size, num_channels, num_features * num_steps)
-    #     return y
-
-
     def forward(
             self,
             x, # (bitch_size, num_channels, num_features, time_steps)(B,channels, K, L)

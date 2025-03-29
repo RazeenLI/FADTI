@@ -51,7 +51,7 @@ def parse_id(id):
         observed_values.append(parse_data(data[data["Time"] == h]))
 
     observed_values = np.array(observed_values)
-    observed_values = np.nan_to_num(observed_values)
+    # observed_values = np.nan_to_num(observed_values)
     return observed_values
 
 def create_data():
@@ -101,23 +101,23 @@ def get_dataloader(
     rng = np.random.default_rng(seed)
 
     if missing_pattern == 'block':
-        eval_masks = sample_mask(
+        gt_masks = sample_mask(
             observed_masks=observed_masks,
             missing_ratio=missing_ratio, 
             rng=rng
         )
     elif missing_pattern == 'point':
-        eval_masks = sample_mask(
+        gt_masks = sample_mask(
             observed_masks=observed_masks,
             missing_ratio=missing_ratio, 
             rng=rng
         )
-    gt_masks = (1 - (eval_masks | (1 - observed_masks))).astype('uint8')
+    # gt_masks = (1 - (eval_masks | (1 - observed_masks))).astype('uint8')
 
     print(
-        "Original missing ratio = {:.4f}\nArtificial missing ratio = {:.4f}\nArtificial missing pattern: {}\nOverall missing ratio = {:.4f}".format(
+        "Original missing ratio = {:.4f}\nArtificial missing pattern: {}\nOverall missing ratio = {:.4f}".format(
             1 - np.sum(observed_masks) / observed_masks.size,
-            np.sum(eval_masks) / eval_masks.size,
+            # np.sum(eval_masks) / eval_masks.size,
             missing_pattern,
             1 - np.sum(gt_masks) / gt_masks.size,
         )

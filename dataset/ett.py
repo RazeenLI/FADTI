@@ -65,23 +65,17 @@ def get_dataloader(
 
     if missing_pattern == 'block':
         gt_masks = sample_mask(
-            shape=observed_values.shape, 
-            p=0.0015, 
-            p_noise=missing_ratio, 
-            min_seq=12, 
-            max_seq=12 * 4, 
+            observed_masks=observed_masks,
+            missing_ratio=missing_ratio, 
             rng=rng
         )
     elif missing_pattern == 'point':
         gt_masks = sample_mask(
-            shape=observed_values.shape, 
-            p=0.0, 
-            p_noise=missing_ratio, 
-            max_seq=12, 
-            min_seq=12 * 4, 
+            observed_masks=observed_masks,
+            missing_ratio=missing_ratio, 
             rng=rng
         )
-    # gt_masks = (1 - (eval_masks | (1 - observed_masks))).astype('uint8')
+    gt_masks = (1 - (gt_masks | (1 - observed_masks))).astype('uint8')
 
     print(
         "Original missing ratio = {:.4f}\nArtificial missing pattern: {}\nOverall missing ratio = {:.4f}".format(
@@ -141,7 +135,7 @@ def get_dataloader(
     return train_loader, valid_loader, test_loader
 
 class ETT_Dataset(Dataset):
-    def __init__(self, observed_values, observed_masks, gt_masks, eval_length=24, use_index_list=None):
+    def __init__(self, observed_values, observed_masks, gt_masks, eval_length=96, use_index_list=None):
         self.eval_length = eval_length
         self.observed_values = observed_values
         self.observed_masks = observed_masks

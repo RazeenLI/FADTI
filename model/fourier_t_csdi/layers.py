@@ -105,16 +105,16 @@ class TemporalAttention(nn.Module):
         ):
         super().__init__()
         self.is_cross = is_cross
-        # self.time_layer = get_transformer(
-        #     num_heads=num_heads, 
-        #     num_layers=num_layers, 
-        #     num_channels=num_channels
-        # )
+        self.time_layer = get_transformer(
+            num_heads=num_heads, 
+            num_layers=num_layers, 
+            num_channels=num_channels
+        )
         self.fft_layer = FourierBasisMapping(
             context_window=num_steps,
             target_window=num_steps,
         )
-        # self.fusion_layer = nn.Linear(num_channels * 2, num_channels)
+        self.fusion_layer = nn.Linear(num_channels * 2, num_channels)
         # self.norm = nn.LayerNorm(num_channels)  # 针对每个时间步内的 channel 归一化
 
 
@@ -128,7 +128,7 @@ class TemporalAttention(nn.Module):
         # Frequenct Domain
         v_fft = x.reshape(batch_size, num_channels, num_features, num_steps).permute(0, 2, 1, 3).reshape(batch_size * num_features, num_channels, num_steps).permute(0, 2, 1)
         v_fft = self.fft_layer(v_fft)
-        # v_fft = v_fft.permute(1, 0, 2)
+        v_fft = v_fft.permute(1, 0, 2)
         # v self imformation, q other information
         # combine
         # 简单平均融合（也可以采用加权或拼接后再映射 cat -> linear 的方式）
@@ -137,15 +137,16 @@ class TemporalAttention(nn.Module):
         # weights = torch.softmax(torch.stack([self.alpha, self.beta]), dim=0)
         # v = weights[0] * v + weights[1] * x_fft
         # 拼接后再映射 cat -> linear
-        # v = torch.cat([v, v_fft], dim=-1)
-        # v = self.fusion_layer(v)
+        v = torch.cat([v, v_fft], dim=-1)
+        v = self.fusion_layer(v)
 
-        # if self.is_cross:
-        #     q = itp_x.reshape(batch_size, num_channels, num_features, num_steps).permute(0, 2, 1, 3).reshape(batch_size * num_features, num_channels, num_steps).permute(2, 0, 1)
-        #     x = self.time_layer(q, v, v).permute(1, 2, 0)
-        # else:
-        #     x = self.time_layer(v, v, v).permute(1, 2, 0)
-        x = v_fft.permute(0, 2, 1)
+        if self.is_cross:
+            q = itp_x.reshape(batch_size, num_channels, num_features, num_steps).permute(0, 2, 1, 3).reshape(batch_size * num_features, num_channels, num_steps).permute(2, 0, 1)
+            x = self.time_layer(q, v, v).permute(1, 2, 0)
+        else:
+            x = self.time_layer(v, v, v).permute(1, 2, 0)
+        # x = self.time_layer(v, v_fft, v_fft).permute(1, 2, 0)
+        # x = v_fft.permute(0, 2, 1)
 
         x = x.reshape(batch_size, num_features, num_channels, num_steps).permute(0, 2, 1, 3).reshape(batch_size, num_channels, num_features * num_steps)
         return x

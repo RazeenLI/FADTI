@@ -75,7 +75,7 @@ def get_dataloader(
             missing_ratio=missing_ratio, 
             rng=rng
         )
-    gt_masks = (1 - (gt_masks | (1 - observed_masks))).astype('uint8')
+    # gt_masks = (1 - (gt_masks | (1 - observed_masks))).astype('uint8')
 
     print(
         "Original missing ratio = {:.4f}\nArtificial missing pattern: {}\nOverall missing ratio = {:.4f}".format(

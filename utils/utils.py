@@ -1,33 +1,46 @@
 import numpy as np
 
+def create_gt_mask(single_mask, missing_ratio=0.1):
+    # single_mask 的 shape 为 (H, W, ...) 表示单个数据的掩码
+    flat_mask = single_mask.reshape(-1).copy()
+    obs_indices = np.where(flat_mask)[0]
+    miss_indices = np.random.choice(
+        obs_indices, int(len(obs_indices) * missing_ratio), replace=False
+    )
+    flat_mask[miss_indices] = False
+    return flat_mask.reshape(single_mask.shape)
+
 def sample_mask(
-    shape, 
-    p=0.0015, 
-    p_noise=0.05, 
-    max_seq=1, 
-    min_seq=1, 
+    observed_masks, 
+    missing_ratio=0.05, 
     rng=None
 ):  # block missing, point missing
     if rng is None:
-        rand = np.random.random
-        randint = np.random.randint
-    else:
-        rand = rng.random
-        randint = rng.integers
-    mask = rand(shape) < p
-    for col in range(mask.shape[1]):
-        idxs = np.flatnonzero(mask[:, col])
-        if not len(idxs):
-            continue
-        fault_len = min_seq
-        if max_seq > min_seq:
-            fault_len = fault_len + int(randint(max_seq - min_seq))
-        idxs_ext = np.concatenate([np.arange(i, i + fault_len) for i in idxs])
-        idxs = np.unique(idxs_ext)
-        idxs = np.clip(idxs, 0, shape[0] - 1)
-        mask[idxs, col] = True
-    mask = mask | (rand(mask.shape) < p_noise)
-    return mask.astype("uint8")
+        rand = np.random
+
+    # 假设 observed_masks 的第一维代表不同的数据样本，shape = (N, ...)
+    masks_list = []
+    for i in range(observed_masks.shape[0]):
+        masks_list.append(create_gt_mask(observed_masks[i], missing_ratio=missing_ratio))
+
+    masks = np.stack(masks_list, axis=0)
+
+    return masks.astype("uint8")
+
+    # mask = rand(shape) < p
+    # for col in range(mask.shape[1]):
+    #     idxs = np.flatnonzero(mask[:, col])
+    #     if not len(idxs):
+    #         continue
+    #     fault_len = min_seq
+    #     if max_seq > min_seq:
+    #         fault_len = fault_len + int(randint(max_seq - min_seq))
+    #     idxs_ext = np.concatenate([np.arange(i, i + fault_len) for i in idxs])
+    #     idxs = np.unique(idxs_ext)
+    #     idxs = np.clip(idxs, 0, shape[0] - 1)
+    #     mask[idxs, col] = True
+    # mask = mask | (rand(mask.shape) < p_noise)
+    # return mask.astype("uint8")
 
 
 def data_normalize(observed_values, observed_masks, num_features):

@@ -289,13 +289,13 @@ def get_dataloader(
 
     if missing_pattern == 'block':
         eval_masks = sample_mask(
-            observed_values=observed_values,
+            observed_masks=observed_masks,
             missing_ratio=missing_ratio, 
             rng=rng
         )
     elif missing_pattern == 'point':
         eval_masks = sample_mask(
-            observed_values=observed_values,
+            observed_masks=observed_masks,
             missing_ratio=missing_ratio, 
             rng=rng
         )

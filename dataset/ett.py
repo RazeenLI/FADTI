@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader, Dataset
 from utils.utils import sample_mask, data_normalize
 
 def create_data():
-    df = pd.read_csv('./data/ETTh1.csv')
+    df = pd.read_csv('./data/ETTm1.csv')
 
     df['date'] = pd.to_datetime(df['date'], format='%Y-%m-%d %H:%M:%S', errors='coerce')
     df['day'] = df['date'].dt.date
@@ -34,7 +34,7 @@ def create_data():
 def get_data():
     # get total dataset, if not exit, create new dataset
     # 1. load data
-    path = ("./data/ett.pk")
+    path = ("./data/ettm1.pk")
 
     if os.path.isfile(path):  
         # load data file
@@ -64,7 +64,7 @@ def get_dataloader(
     rng = np.random.default_rng(seed)
 
     if missing_pattern == 'block':
-        eval_masks = sample_mask(
+        gt_masks = sample_mask(
             shape=observed_values.shape, 
             p=0.0015, 
             p_noise=missing_ratio, 
@@ -73,7 +73,7 @@ def get_dataloader(
             rng=rng
         )
     elif missing_pattern == 'point':
-        eval_masks = sample_mask(
+        gt_masks = sample_mask(
             shape=observed_values.shape, 
             p=0.0, 
             p_noise=missing_ratio, 
@@ -81,12 +81,11 @@ def get_dataloader(
             min_seq=12 * 4, 
             rng=rng
         )
-    gt_masks = (1 - (eval_masks | (1 - observed_masks))).astype('uint8')
+    # gt_masks = (1 - (eval_masks | (1 - observed_masks))).astype('uint8')
 
     print(
-        "Original missing ratio = {:.4f}\nArtificial missing ratio = {:.4f}\nArtificial missing pattern: {}\nOverall missing ratio = {:.4f}".format(
+        "Original missing ratio = {:.4f}\nArtificial missing pattern: {}\nOverall missing ratio = {:.4f}".format(
             1 - np.sum(observed_masks) / observed_masks.size,
-            np.sum(eval_masks) / eval_masks.size,
             missing_pattern,
             1 - np.sum(gt_masks) / gt_masks.size,
         )

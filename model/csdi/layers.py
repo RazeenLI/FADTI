@@ -6,18 +6,18 @@ import torch.nn.functional as F
 from nn.transformer import TransformerEncoder_QKV, TransformerEncoderLayer_QKV
 
 def get_transformer(num_heads=8, num_layers=1, num_channels=64):
-    # encoder_layer = TransformerEncoderLayer_QKV(
-    #     dim_model=num_channels,
-    #     num_heads=num_heads,
-    #     dim_feedforward=64,
-    #     activation="gelu"
-    # )
-    # return TransformerEncoder_QKV(
-    #     encoder_layer=encoder_layer,
-    #     num_layers=num_layers
-    # )
-    encoder_layer = nn.TransformerEncoderLayer(d_model=num_channels, nhead=num_heads, dim_feedforward=64, activation="gelu")
-    return nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
+    encoder_layer = TransformerEncoderLayer_QKV(
+        dim_model=num_channels,
+        num_heads=num_heads,
+        dim_feedforward=64,
+        activation="gelu"
+    )
+    return TransformerEncoder_QKV(
+        encoder_layer=encoder_layer,
+        num_layers=num_layers
+    )
+    # encoder_layer = nn.TransformerEncoderLayer(d_model=num_channels, nhead=num_heads, dim_feedforward=64, activation="gelu")
+    # return nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
 
 def conv1d_with_init(in_channels, out_channels, kernel_size):
     layer = nn.Conv1d(in_channels, out_channels, kernel_size)
@@ -117,8 +117,8 @@ class TemporalAttention(nn.Module):
             q = itp_x.reshape(batch_size, num_channels, num_features, num_steps).permute(0, 2, 1, 3).reshape(batch_size * num_features, num_channels, num_steps).permute(2, 0, 1)
             x = self.time_layer(q, v, v).permute(1, 2, 0) # self.time_layer(q, q, v).permute(1, 2, 0)
         else:
-            # x = self.time_layer(v, v, v).permute(1, 2, 0)
-            x = self.time_layer(v).permute(1, 2, 0)
+            x = self.time_layer(v, v, v).permute(1, 2, 0)
+            # x = self.time_layer(v).permute(1, 2, 0)
 
 
         x = x.reshape(batch_size, num_features, num_channels, num_steps).permute(0, 2, 1, 3).reshape(batch_size, num_channels, num_features * num_steps)
@@ -149,8 +149,8 @@ class FeatureAttention(nn.Module):
             q = itp_x.reshape(batch_size, num_channels, num_features, num_steps).permute(0, 3, 1, 2).reshape(batch_size * num_steps, num_channels, num_features).permute(2, 0, 1)
             x = self.feature_layer(q, v, v).permute(1, 2, 0)
         else:
-            # x = self.feature_layer(v, v, v).permute(1, 2, 0)
-            x = self.feature_layer(v).permute(1, 2, 0)
+            x = self.feature_layer(v, v, v).permute(1, 2, 0)
+            # x = self.feature_layer(v).permute(1, 2, 0)
         x = x.reshape(batch_size, num_steps, num_channels, num_features).permute(0, 2, 3, 1).reshape(batch_size, num_channels, num_features * num_steps)
         return x
 

@@ -54,7 +54,8 @@ def get_dataloader(
         seed=1,
         missing_pattern='block',
         missing_ratio=0.0,
-        batch_size=16
+        batch_size=16,
+        num_steps=96
 ):
     # get total dataset, if not exit, create new dataset
     observed_values = get_data()
@@ -92,7 +93,8 @@ def get_dataloader(
     dataset = ETT_Dataset(
         observed_masks=observed_masks, 
         observed_values=observed_values, 
-        gt_masks=gt_masks
+        gt_masks=gt_masks,
+        eval_length=num_steps
     )
     indlist = np.arange(len(dataset))
 
@@ -112,7 +114,8 @@ def get_dataloader(
         use_index_list=train_index,
         observed_masks=observed_masks, 
         observed_values=observed_values, 
-        gt_masks=gt_masks
+        gt_masks=gt_masks,
+        eval_length=num_steps
     )
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=1)
 
@@ -120,7 +123,8 @@ def get_dataloader(
         use_index_list=valid_index, 
         observed_masks=observed_masks, 
         observed_values=observed_values, 
-        gt_masks=gt_masks
+        gt_masks=gt_masks,
+        eval_length=num_steps
     )
     valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=0)
 
@@ -128,14 +132,15 @@ def get_dataloader(
         use_index_list=test_index, 
         observed_masks=observed_masks, 
         observed_values=observed_values, 
-        gt_masks=gt_masks
+        gt_masks=gt_masks,
+        eval_length=num_steps
     )
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=0)
 
     return train_loader, valid_loader, test_loader
 
 class ETT_Dataset(Dataset):
-    def __init__(self, observed_values, observed_masks, gt_masks, eval_length=96, use_index_list=None):
+    def __init__(self, observed_values, observed_masks, gt_masks, eval_length, use_index_list=None):
         self.eval_length = eval_length
         self.observed_values = observed_values
         self.observed_masks = observed_masks

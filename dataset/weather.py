@@ -7,71 +7,33 @@ import pandas as pd
 from torch.utils.data import DataLoader, Dataset
 from utils.utils import sample_mask, data_normalize
 
-# 35 attributes which contains enough non-values
-attributes = ['DiasABP', 'HR', 'Na', 'Lactate', 'NIDiasABP', 'PaO2', 'WBC', 'pH', 'Albumin', 'ALT', 'Glucose', 'SaO2',
-              'Temp', 'AST', 'Bilirubin', 'HCO3', 'BUN', 'RespRate', 'Mg', 'HCT', 'SysABP', 'FiO2', 'K', 'GCS',
-              'Cholesterol', 'NISysABP', 'TroponinT', 'MAP', 'TroponinI', 'PaCO2', 'Platelets', 'Urine', 'NIMAP',
-              'Creatinine', 'ALP']
-
-
-def extract_hour(x):
-    h, _ = map(int, x.split(":"))
-    return h
-
-
-def parse_data(x):
-    # extract the last value for each attribute
-    x = x.set_index("Parameter").to_dict()["Value"]
-    values = []
-
-    for attr in attributes:
-        if x.__contains__(attr):
-            values.append(x[attr])
-        else:
-            values.append(np.nan)
-    return values
-
-def get_idlist():
-    patient_id = []
-    for filename in os.listdir("./data/physio/set-a"):
-        match = re.search("\d{6}", filename)
-        if match:
-            patient_id.append(match.group())
-    patient_id = np.sort(patient_id)
-    return patient_id
-
-def parse_id(id):
-    data = pd.read_csv("./data/physio/set-a/{}.txt".format(id))
-    # set hour
-    data["Time"] = data["Time"].apply(lambda x: extract_hour(x))
-
-    # create data for 48 hours x 35 attributes
-    observed_values = []
-    for h in range(48):
-        observed_values.append(parse_data(data[data["Time"] == h]))
-
-    observed_values = np.array(observed_values)
-    # observed_values = np.nan_to_num(observed_values)
-    return observed_values
-
 def create_data():
+    df = pd.read_csv('Data/weather.csv', parse_dates=['date'])
+
+    df['day'] = (df['date'] - pd.Timedelta(minutes=10)).dt.date
+    df = df.sort_values('date')
+    feature_cols = df.columns.drop(['date', 'day'])
+
+    grouped = df.groupby('day')
     observed_values = []
-    idlist = get_idlist()
-    for id in idlist:
-        try:
-            observed_values.append(parse_id(id))
-        except Exception as e:
-            print(id, e)
-            continue
-    observed_values = np.array(observed_values)
+    for day, group in grouped:
+        group = group.sort_values('date')
+        arr = group[feature_cols].to_numpy()
+        observed_values.append(arr)
+    observed_values
+
+    # 6. 以第一天的时间步数作为标准，筛选出符合要求的天的数据
+    expected_time_steps = observed_values[0].shape[0]
+    observed_values = [arr for arr in observed_values if arr.shape[0] == expected_time_steps]
+
+    observed_values = np.stack(observed_values, axis=0)
 
     return observed_values 
-
 
 def get_data():
     # get total dataset, if not exit, create new dataset
     # 1. load data
-    path = ("./data/physio.pk")
+    path = ("./data/weather.pk")
 
     if os.path.isfile(path):  
         # load data file
@@ -85,14 +47,14 @@ def get_data():
             pickle.dump(observed_values, f)
     return observed_values
     
-
+    
 def get_dataloader(
         nfold=None,
         seed=1,
         missing_pattern='block',
         missing_ratio=0.0,
         batch_size=16,
-        num_steps=48
+        num_steps=144
 ):
     # get total dataset, if not exit, create new dataset
     observed_values = get_data()
@@ -118,7 +80,6 @@ def get_dataloader(
     print(
         "Original missing ratio = {:.4f}\nArtificial missing pattern: {}\nOverall missing ratio = {:.4f}".format(
             1 - np.sum(observed_masks) / observed_masks.size,
-            # np.sum(eval_masks) / eval_masks.size,
             missing_pattern,
             1 - np.sum(gt_masks) / gt_masks.size,
         )
@@ -126,9 +87,9 @@ def get_dataloader(
 
     # data normalization
     observed_values = np.nan_to_num(observed_values)
-    observed_values = data_normalize(observed_values, observed_masks, 35)
+    # observed_values = data_normalize(observed_values, observed_masks, 7)
     # devide into three dataloader and return 
-    dataset = Physio_Dataset(
+    dataset = Weather_Dataset(
         observed_masks=observed_masks, 
         observed_values=observed_values, 
         gt_masks=gt_masks,
@@ -148,7 +109,7 @@ def get_dataloader(
     train_index = remain_index[:num_train]
     valid_index = remain_index[num_train:]
 
-    train_dataset = Physio_Dataset(
+    train_dataset = Weather_Dataset(
         use_index_list=train_index,
         observed_masks=observed_masks, 
         observed_values=observed_values, 
@@ -157,7 +118,7 @@ def get_dataloader(
     )
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=1)
 
-    valid_dataset = Physio_Dataset(
+    valid_dataset = Weather_Dataset(
         use_index_list=valid_index, 
         observed_masks=observed_masks, 
         observed_values=observed_values, 
@@ -166,7 +127,7 @@ def get_dataloader(
     )
     valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=0)
 
-    test_dataset = Physio_Dataset(
+    test_dataset = Weather_Dataset(
         use_index_list=test_index, 
         observed_masks=observed_masks, 
         observed_values=observed_values, 
@@ -177,7 +138,7 @@ def get_dataloader(
 
     return train_loader, valid_loader, test_loader
 
-class Physio_Dataset(Dataset):
+class Weather_Dataset(Dataset):
     def __init__(self, observed_values, observed_masks, gt_masks, eval_length, use_index_list=None):
         self.eval_length = eval_length
         self.observed_values = observed_values

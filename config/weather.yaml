@@ -3,6 +3,6 @@ data:
   test_missing_ratio: 0.1
   seed: 1
   num_steps: 144
-  num_features: 7
+  num_features: 21
   batch_size: 16 
   missing_pattern: 'point'

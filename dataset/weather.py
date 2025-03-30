@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader, Dataset
 from utils.utils import sample_mask, data_normalize
 
 def create_data():
-    df = pd.read_csv('Data/weather.csv', parse_dates=['date'])
+    df = pd.read_csv('./data/weather.csv', parse_dates=['date'])
 
     df['day'] = (df['date'] - pd.Timedelta(minutes=10)).dt.date
     df = df.sort_values('date')

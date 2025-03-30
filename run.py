@@ -1,4 +1,6 @@
-# python run.py --model "ftcsdi" --data "physio" --nsample 100 --device "cuda:6"
+# python run.py --model "ftcsdi" --data "ett" --nsample 100 --device "cuda:6"
+# python run.py --model "csdi" --data "ett" --nsample 100 --device "cuda:5"
+# python run.py --model "csdi_ori" --data "ett" --nsample 100 --device "cuda:4"
 import argparse
 import torch
 import datetime
@@ -50,6 +52,17 @@ if args.data == "physio":
     data_info = config["data"]["missing_pattern"] + "_" + str(config["data"]["test_missing_ratio"])
 elif args.data == "ett":
     from dataset.ett import get_dataloader
+    train_loader, valid_loader, test_loader = get_dataloader(
+        seed=config["data"]["seed"],
+        nfold=config["data"]["nfold"],
+        batch_size=config["data"]["batch_size"],
+        missing_ratio=config["data"]["test_missing_ratio"],
+        missing_pattern=config["data"]["missing_pattern"],
+        num_steps=config["data"]["num_steps"],
+    )
+    data_info = config["data"]["missing_pattern"] + "_" + str(config["data"]["test_missing_ratio"])
+elif args.data == "weather":
+    from dataset.weather import get_dataloader
     train_loader, valid_loader, test_loader = get_dataloader(
         seed=config["data"]["seed"],
         nfold=config["data"]["nfold"],

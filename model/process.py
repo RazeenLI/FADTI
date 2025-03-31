@@ -33,6 +33,12 @@ class Process(object):
         p1 = int(0.75 * epochs)
         p2 = int(0.9 * epochs)
         self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[p1, p2], gamma=0.1)
+
+        self.info = {
+            "train": [],
+            "valid": [],
+            "test": []
+        }
     
     def train(
             self,
@@ -69,6 +75,10 @@ class Process(object):
                     )
                     # if batch_index >= config["itr_per_epoch"]:
                     #     break
+                self.info["train"].append({
+                    "avg_epoch_loss": avg_loss / batch_index,
+                    "epoch": epoch,
+                })
 
                 self.scheduler.step()
             if valid_loader is not None and (epoch + 1) % valid_epoch_interval == 0:
@@ -87,11 +97,20 @@ class Process(object):
                                 },
                                 refresh=False,
                             )
+                        self.info["valid"].append({
+                            "avg_epoch_loss": avg_loss_valid / batch_index,
+                            "epoch": epoch,
+                        })
                 best_valid_loss = self.save_model(output_path, avg_loss_valid / batch_index, best_valid_loss, epoch)
 
         if self.save_strategy == "new":
             best_valid_loss = self.save_model(output_path, best_valid_loss, best_valid_loss, self.epochs)
             torch.save(self.model.state_dict(), output_path)
+        
+        with open(
+            foldername + "/result_train_valid.pk", "wb"
+        ) as f:
+            pickle.dump(self.info, f,)
     
 
     def save_model(self, save_path, current_valid_loss, best_valid_loss, epoch):

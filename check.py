@@ -45,11 +45,34 @@ train_loader_1, valid_loader_1, test_loader_1 = get_dataloader(
 )
 data_info = config["data"]["missing_pattern"] + "_" + str(config["data"]["test_missing_ratio"])
 
-from dataset.physio_old import get_dataloader
-train_loader_2, valid_loader_2, test_loader_2 = get_dataloader(
+# from dataset.physio_old import get_dataloader
+# train_loader_2, valid_loader_2, test_loader_2 = get_dataloader(
+#     seed=config["data"]["seed"],
+#     nfold=config["data"]["nfold"],
+#     batch_size=config["data"]["batch_size"],
+#     missing_ratio=config["data"]["test_missing_ratio"],
+#     missing_pattern=config["data"]["missing_pattern"],
+# )
+
+
+train_loader_3, valid_loader_3, test_loader_3 = get_dataloader(
     seed=config["data"]["seed"],
     nfold=config["data"]["nfold"],
     batch_size=config["data"]["batch_size"],
     missing_ratio=config["data"]["test_missing_ratio"],
     missing_pattern=config["data"]["missing_pattern"],
 )
+
+all_equal = True
+for i, (batch1, batch2) in enumerate(zip(test_loader_1, test_loader_3)):
+    for key in batch1.keys():
+        if not torch.equal(batch1[key], batch2[key]):
+            print(f"Batch {i}, key '{key}' is different.")
+            all_equal = False
+for i, (batch1, batch2) in enumerate(zip(valid_loader_1, valid_loader_3)):
+    for key in batch1.keys():
+        if not torch.equal(batch1[key], batch2[key]):
+            print(f"Batch {i}, key '{key}' is different.")
+            all_equal = False
+if all_equal:
+    print("All batches are identical.")

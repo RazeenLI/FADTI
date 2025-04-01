@@ -45,7 +45,7 @@ class Process(object):
             # config,
             train_loader,
             valid_loader=None,
-            valid_epoch_interval=20,
+            valid_epoch_interval=10,
             foldername="",
     ):
         if foldername != "":

@@ -4,6 +4,7 @@ from torch.optim import AdamW, SGD
 from tqdm import tqdm
 from typing import Union, Optional
 import pickle
+from nn.looksam import LookSAM
 
 class Process(object):
     def __init__(
@@ -30,7 +31,8 @@ class Process(object):
         
         # set up optimizer
         # self.optimizer = AdamW(self.model.parameters(), lr=learning_rate, weight_decay=1e-6)
-        self.optimizer = SGD(self.model.parameters(), momentum=0.9, lr=learning_rate, weight_decay=1e-6)
+        # self.optimizer = SGD(self.model.parameters(), momentum=0.9, lr=learning_rate, weight_decay=1e-6)
+        self.optimizer = LookSAM(model.parameters(), AdamW, lr=0.1, rho=0.05, alpha=0.5, k=5)
         # p1 = int(0.75 * epochs)
         # p2 = int(0.9 * epochs)
         # self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[p1, p2], gamma=0.1)
@@ -61,13 +63,23 @@ class Process(object):
             self.model.train()
             with tqdm(train_loader, mininterval=5.0, maxinterval=50.0) as it:
                 for batch_index, batch_data in enumerate(it, start=1):
-                    self.optimizer.zero_grad()
-
-                    loss = self.model(batch_data)
-                    loss.backward()
+                    def closure():
+                        self.optimizer.zero_grad()    # 每次调用 closure 前清零梯度
+                        loss = self.model(batch_data)
+                        loss.backward()
+                        return loss
+                    # 使用 SAM/LookSAM 的 step()，它会内部调用 closure 两次
+                    loss = self.optimizer.step(closure)
                     avg_loss += loss.item()
-                    # epoch_train_loss_collector.append(loss.item())
-                    self.optimizer.step()
+
+                    # self.optimizer.zero_grad()
+                    # loss = self.model(batch_data)
+                    # loss.backward()
+
+                    # avg_loss += loss.item()
+                    # # epoch_train_loss_collector.append(loss.item())
+                    # self.optimizer.step()
+
                     it.set_postfix(
                         ordered_dict={
                             "avg_epoch_loss": avg_loss / batch_index,

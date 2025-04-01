@@ -118,6 +118,10 @@ class Process(object):
         if self.save_strategy == "best":
             if current_valid_loss < best_valid_loss:
                 best_valid_loss = current_valid_loss
+                self.info["save"] = {
+                    "save strategy": "best",
+                    "epoch": epoch
+                }
                 print("\nBest loss updated to", best_valid_loss, "at epoch", epoch)
                 torch.save(self.model.state_dict(), save_path)
         elif self.save_strategy == "new":
@@ -131,6 +135,10 @@ class Process(object):
         else:
             # 什么也不保存
             pass
+        self.info["save"] = {
+            "save strategy": self.save_strategy,
+            "epoch": epoch
+        }
         return best_valid_loss
 
 

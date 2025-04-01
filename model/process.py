@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from torch.optim import Adam
+from torch.optim import AdamW, SGD
 from tqdm import tqdm
 from typing import Union, Optional
 import pickle
@@ -29,10 +29,13 @@ class Process(object):
         self.model = model.to(self.device)
         
         # set up optimizer
-        self.optimizer = Adam(self.model.parameters(), lr=learning_rate, weight_decay=1e-6)
-        p1 = int(0.75 * epochs)
-        p2 = int(0.9 * epochs)
-        self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[p1, p2], gamma=0.1)
+        # self.optimizer = AdamW(self.model.parameters(), lr=learning_rate, weight_decay=1e-6)
+        self.optimizer = SGD(self.model.parameters(), momentum=0.9, lr=learning_rate, weight_decay=1e-6)
+        # p1 = int(0.75 * epochs)
+        # p2 = int(0.9 * epochs)
+        # self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[p1, p2], gamma=0.1)
+        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=epochs)
+
 
         self.info = {
             "train": [],

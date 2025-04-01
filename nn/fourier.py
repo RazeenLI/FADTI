@@ -36,7 +36,8 @@ class FBMLinear(nn.Module):
     def __init__(
             self,
             context_window,
-            target_window
+            target_window,
+            dropout=0.1
     ):
         super().__init__()
 
@@ -59,6 +60,7 @@ class FBMLinear(nn.Module):
         linear_input = context_window * (context_window // 2 + 1)
 
         self.flatten_layer = nn.Flatten(start_dim=-2)
+        self.dropout = nn.Dropout(p=dropout)
         self.linear_layer = nn.Linear(linear_input, target_window)
 
     def forward(
@@ -73,8 +75,8 @@ class FBMLinear(nn.Module):
 
         x = basis_cos + basis_sin
         x = self.flatten_layer(x)
+        x = self.dropout(x)
         x = self.linear_layer(x)
-        
         return x
     
 

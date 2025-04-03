@@ -5,7 +5,7 @@ from tqdm import tqdm
 from typing import Union, Optional
 import pickle
 # from nn.looksam import LookSAM
-from nn.sam import SAM
+# from nn.sam import SAM
 
 class Process(object):
     def __init__(
@@ -53,8 +53,6 @@ class Process(object):
             # config,
             train_loader,
             valid_loader=None,
-            test_loader=None,
-            test_epoch_interval=20,
             valid_epoch_interval=10,
             foldername="",
     ):
@@ -68,23 +66,23 @@ class Process(object):
             self.model.train()
             with tqdm(train_loader, mininterval=5.0, maxinterval=50.0) as it:
                 for batch_index, batch_data in enumerate(it, start=1):
-                    def closure():
-                        # it.write(f"Inside closure for batch {batch_index}")
-                        self.optimizer.zero_grad()    # 每次调用 closure 前清零梯度
-                        loss = self.model(batch_data)
-                        loss.backward()
-                        # 调试输出：打印梯度非空参数的数量
-                        # grad_count = sum(p.grad is not None for p in self.model.parameters())
-                        # it.write(f"Batch {batch_index}: Number of parameters with gradients: {grad_count}")
-                        return loss
-                    # 使用 SAM/LookSAM 的 step()，它会内部调用 closure 两次
-                    loss = closure()
+                    # def closure():
+                    #     # it.write(f"Inside closure for batch {batch_index}")
+                    #     self.optimizer.zero_grad()    # 每次调用 closure 前清零梯度
+                    #     loss = self.model(batch_data)
+                    #     loss.backward()
+                    #     # 调试输出：打印梯度非空参数的数量
+                    #     # grad_count = sum(p.grad is not None for p in self.model.parameters())
+                    #     # it.write(f"Batch {batch_index}: Number of parameters with gradients: {grad_count}")
+                    #     return loss
+                    # # 使用 SAM/LookSAM 的 step()，它会内部调用 closure 两次
+                    # loss = closure()
                     # self.optimizer.step(closure)
                     # avg_loss += loss.item()
 
-                    # self.optimizer.zero_grad()
-                    # loss = self.model(batch_data)
-                    # loss.backward()
+                    self.optimizer.zero_grad()
+                    loss = self.model(batch_data)
+                    loss.backward()
 
                     avg_loss += loss.item()
                     self.optimizer.step()
@@ -113,7 +111,6 @@ class Process(object):
                         for batch_index, valid_batch in enumerate(it, start=1):
                             loss = self.model(valid_batch)
                             avg_loss_valid += loss.item()
-                            # val_loss_collector.append(loss.item())
                             it.set_postfix(
                                 ordered_dict={
                                     "valid_avg_epoch_loss": avg_loss_valid / batch_index,
@@ -127,13 +124,6 @@ class Process(object):
                         })
                 best_valid_loss = self.save_model(output_path, avg_loss_valid / batch_index, best_valid_loss, epoch)
 
-            if test_loader is not None and (epoch + 1) % test_epoch_interval == 0:
-                self.evaluate(
-                    test_loader=test_loader, 
-                    scaler=1, 
-                    foldername=foldername
-                )
-
         if self.save_strategy == "new":
             best_valid_loss = self.save_model(output_path, best_valid_loss, best_valid_loss, self.epochs)
             torch.save(self.model.state_dict(), output_path)
@@ -145,7 +135,7 @@ class Process(object):
     
 
     def save_model(self, save_path, current_valid_loss, best_valid_loss, epoch):
-        # 根据保存策略判断是否保存模型
+        # save model based on save_strategy
         if self.save_strategy == "best":
             if current_valid_loss < best_valid_loss:
                 best_valid_loss = current_valid_loss
@@ -155,12 +145,12 @@ class Process(object):
             print("\nSaving new model at epoch", epoch)
             torch.save(self.model.state_dict(), save_path)
         elif self.save_strategy == "all":
-            # 每个 epoch 保存一个不同的文件，可以在文件名中加入 epoch 信息
+            # save every epoch, add epoch info into saved model
             epoch_output_path = save_path + f"_epoch_{epoch}"
             print("\nSaving model for epoch", epoch)
             torch.save(self.model.state_dict(), epoch_output_path)
         else:
-            # 什么也不保存
+            # save nothing
             return best_valid_loss
         self.info["save"] = {
             "save strategy": self.save_strategy,
@@ -214,13 +204,6 @@ class Process(object):
                     mae_current = torch.abs(error_scaled)
                     mape_current = torch.abs(error_scaled / (c_target * scaler + 1e-8)) * eval_points
 
-                    # mse_current = (
-                    #     ((samples_median.values - c_target) * eval_points) ** 2
-                    # ) * (scaler ** 2)
-                    # mae_current = (
-                    #     torch.abs((samples_median.values - c_target) * eval_points) 
-                    # ) * scaler
-
                     mse_total += mse_current.sum().item()
                     mae_total += mae_current.sum().item()
                     mape_total += mape_current.sum().item()
@@ -258,10 +241,10 @@ class Process(object):
                         f,
                     )
 
-                CRPS = calc_quantile_CRPS(
-                    all_target, all_generated_samples, all_evalpoint, mean_scaler, scaler
-                )
-                CRPS_sum = calc_quantile_CRPS_sum(
+                rmse = np.sqrt(mse_total / evalpoints_total).item()
+                mae = mae_total / evalpoints_total
+                mape = mape_total / evalpoints_total
+                crps = calc_quantile_CRPS(
                     all_target, all_generated_samples, all_evalpoint, mean_scaler, scaler
                 )
 
@@ -270,22 +253,23 @@ class Process(object):
                 ) as f:
                     pickle.dump(
                         [
-                            np.sqrt(mse_total / evalpoints_total),
-                            mae_total / evalpoints_total,
-                            mape_total / evalpoints_total,
-                            CRPS,
+                            rmse,
+                            mae,
+                            mape,
+                            crps,
                         ],
                         f,
                     )
-                    print("RMSE:", np.sqrt(mse_total / evalpoints_total))
-                    print("MAE:", mae_total / evalpoints_total)
-                    print("MAPE:", mape_total / evalpoints_total)
-                    print("CRPS:", CRPS)
-                    print("CRPS_sum:", CRPS_sum)
+                    print("RMSE:", rmse)
+                    print("MAE:", mae)
+                    print("MAPE:", mape)
+                    print("CRPS:", crps)
+
                 self.info["test"].append({
-                    "RMSE": np.sqrt(mse_total / evalpoints_total),
-                    "MAE": mae_total / evalpoints_total,
-                    "MAPE": mape_total / evalpoints_total
+                    "RMSE": rmse,
+                    "MAE": mae,
+                    "MAPE": mape,
+                    "CRPS": crps
                 })
 
 def quantile_loss(target, forecast, q: float, eval_points) -> float:
@@ -313,18 +297,3 @@ def calc_quantile_CRPS(target, forecast, eval_points, mean_scaler, scaler):
         CRPS += q_loss / denom
     return CRPS.item() / len(quantiles)
 
-def calc_quantile_CRPS_sum(target, forecast, eval_points, mean_scaler, scaler):
-
-    eval_points = eval_points.mean(-1)
-    target = target * scaler + mean_scaler
-    target = target.sum(-1)
-    forecast = forecast * scaler + mean_scaler
-
-    quantiles = np.arange(0.05, 1.0, 0.05)
-    denom = calc_denominator(target, eval_points)
-    CRPS = 0
-    for i in range(len(quantiles)):
-        q_pred = torch.quantile(forecast.sum(-1),quantiles[i],dim=1)
-        q_loss = quantile_loss(target, q_pred, quantiles[i], eval_points)
-        CRPS += q_loss / denom
-    return CRPS.item() / len(quantiles)

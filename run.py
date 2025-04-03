@@ -1,6 +1,6 @@
-# python run.py --model "ftcsdi" --data "ett" --nsample 100 --device "cuda:6"
-# python run.py --model "csdi" --data "ett" --nsample 100 --device "cuda:5"
-# python run.py --model "csdi_ori" --data "ett" --nsample 100 --device "cuda:4"
+# python run.py --model "ftcsdi" --data "ett" --nsample 100 --nfold 0 --device "cuda:6"
+# python run.py --model "csdi" --data "ett" --nsample 100 --nfold 0 --device "cuda:5"
+# python run.py --model "csdi_ori" --data "ett" --nsample 100 --nfold 0 --device "cuda:4"
 import argparse
 import torch
 import datetime
@@ -19,6 +19,7 @@ parser.add_argument('--device', default='cuda:0', help='Device for Attack')
 
 parser.add_argument("--modelfolder", type=str, default="")
 parser.add_argument("--nsample", type=int, default=100)
+parser.add_argument("--nfold", type=int, default=0) # for 5fold test (valid value:[0-4])
 
 args = parser.parse_args()
 print(args)
@@ -43,7 +44,7 @@ if args.data == "physio":
     from dataset.physio import get_dataloader
     train_loader, valid_loader, test_loader = get_dataloader(
         seed=config["data"]["seed"],
-        nfold=config["data"]["nfold"],
+        nfold=args.nfold,
         batch_size=config["data"]["batch_size"],
         missing_ratio=config["data"]["test_missing_ratio"],
         missing_pattern=config["data"]["missing_pattern"],
@@ -54,7 +55,7 @@ elif args.data == "ett":
     from dataset.ett import get_dataloader
     train_loader, valid_loader, test_loader = get_dataloader(
         seed=config["data"]["seed"],
-        nfold=config["data"]["nfold"],
+        nfold=args.nfold,
         batch_size=config["data"]["batch_size"],
         missing_ratio=config["data"]["test_missing_ratio"],
         missing_pattern=config["data"]["missing_pattern"],
@@ -65,7 +66,7 @@ elif args.data == "weather":
     from dataset.weather import get_dataloader
     train_loader, valid_loader, test_loader = get_dataloader(
         seed=config["data"]["seed"],
-        nfold=config["data"]["nfold"],
+        nfold=args.nfold,
         batch_size=config["data"]["batch_size"],
         missing_ratio=config["data"]["test_missing_ratio"],
         missing_pattern=config["data"]["missing_pattern"],
@@ -118,7 +119,6 @@ elif args.model == "ftcsdi":
     from model.fourier_t_csdi.model import FTCSDI
     config_diff = config["diffusion"]
     model = FTCSDI(
-
             data_name=args.data,
             num_features=config["data"]["num_features"],
             num_steps=config["data"]["num_steps"],

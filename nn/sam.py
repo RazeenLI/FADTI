@@ -25,6 +25,7 @@ class SAM(torch.optim.Optimizer):
                 self.state[p]["old_p"] = p.data.clone()
                 e_w = (torch.pow(p, 2) if group["adaptive"] else 1.0) * p.grad * scale.to(p)
                 p.add_(e_w)  # climb to the local maximum "w + e(w)"
+                # self.state[p]["e_w"] = e_w
 
         if zero_grad: self.zero_grad()
 
@@ -32,8 +33,10 @@ class SAM(torch.optim.Optimizer):
     def second_step(self, zero_grad=False):
         for group in self.param_groups:
             for p in group["params"]:
-                if p.grad is None: continue
+                if p.grad is None or "old_p" not in self.state[p]:
+                    continue
                 p.data = self.state[p]["old_p"]  # get back to "w" from "w + e(w)"
+                # p.sub_(self.state[p]["e_w"])
 
         self.base_optimizer.step()  # do the actual "sharpness-aware" update
 
@@ -50,14 +53,23 @@ class SAM(torch.optim.Optimizer):
 
     def _grad_norm(self):
         shared_device = self.param_groups[0]["params"][0].device  # put everything on the same device, in case of model parallelism
-        norm = torch.norm(
-                    torch.stack([
-                        ((torch.abs(p) if group["adaptive"] else 1.0) * p.grad).norm(p=2).to(shared_device)
-                        for group in self.param_groups for p in group["params"]
-                        if p.grad is not None
-                    ]),
-                    p=2
-               )
+        # norm = torch.norm(
+        #             torch.stack([
+        #                 ((torch.abs(p) if group["adaptive"] else 1.0) * p.grad).norm(p=2).to(shared_device)
+        #                 for group in self.param_groups for p in group["params"]
+        #                 if p.grad is not None
+        #             ]),
+        #             p=2
+        #        )
+        grad_list = [
+            ((torch.abs(p) if group["adaptive"] else 1.0) * p.grad).norm(p=2).to(shared_device)
+            for group in self.param_groups 
+            for p in group["params"] if p.grad is not None
+        ]
+        if len(grad_list) == 0:
+            # 如果没有梯度，返回一个标量0
+            return torch.tensor(0.0, device=shared_device)
+        norm = torch.norm(torch.stack(grad_list), p=2)
         return norm
 
     def load_state_dict(self, state_dict):

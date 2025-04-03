@@ -4,7 +4,8 @@ from torch.optim import AdamW, SGD
 from tqdm import tqdm
 from typing import Union, Optional
 import pickle
-from nn.looksam import LookSAM
+# from nn.looksam import LookSAM
+from nn.sam import SAM
 
 class Process(object):
     def __init__(
@@ -30,9 +31,11 @@ class Process(object):
         self.model = model.to(self.device)
         
         # set up optimizer
-        # self.optimizer = AdamW(self.model.parameters(), lr=learning_rate, weight_decay=1e-6)
+        self.optimizer = AdamW(self.model.parameters(), lr=learning_rate, weight_decay=1e-6)
         # self.optimizer = SGD(self.model.parameters(), momentum=0.9, lr=learning_rate, weight_decay=1e-6)
-        self.optimizer = LookSAM(model.parameters(), AdamW, lr=0.1, rho=0.05, alpha=0.5, k=5)
+        # base_optimizer = AdamW
+        # self.optimizer = SAM(self.model.parameters(), base_optimizer, lr=learning_rate, weight_decay=1e-6)
+        # self.optimizer = LookSAM(self.model.parameters(), base_optimizer, lr=learning_rate, rho=0.05, alpha=0.5, k=5)
         # p1 = int(0.75 * epochs)
         # p2 = int(0.9 * epochs)
         # self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[p1, p2], gamma=0.1)
@@ -50,6 +53,8 @@ class Process(object):
             # config,
             train_loader,
             valid_loader=None,
+            test_loader=None,
+            test_epoch_interval=20,
             valid_epoch_interval=10,
             foldername="",
     ):
@@ -64,21 +69,25 @@ class Process(object):
             with tqdm(train_loader, mininterval=5.0, maxinterval=50.0) as it:
                 for batch_index, batch_data in enumerate(it, start=1):
                     def closure():
+                        # it.write(f"Inside closure for batch {batch_index}")
                         self.optimizer.zero_grad()    # 每次调用 closure 前清零梯度
                         loss = self.model(batch_data)
                         loss.backward()
+                        # 调试输出：打印梯度非空参数的数量
+                        # grad_count = sum(p.grad is not None for p in self.model.parameters())
+                        # it.write(f"Batch {batch_index}: Number of parameters with gradients: {grad_count}")
                         return loss
                     # 使用 SAM/LookSAM 的 step()，它会内部调用 closure 两次
-                    loss = self.optimizer.step(closure)
-                    avg_loss += loss.item()
+                    loss = closure()
+                    # self.optimizer.step(closure)
+                    # avg_loss += loss.item()
 
                     # self.optimizer.zero_grad()
                     # loss = self.model(batch_data)
                     # loss.backward()
 
-                    # avg_loss += loss.item()
-                    # # epoch_train_loss_collector.append(loss.item())
-                    # self.optimizer.step()
+                    avg_loss += loss.item()
+                    self.optimizer.step()
 
                     it.set_postfix(
                         ordered_dict={
@@ -118,6 +127,13 @@ class Process(object):
                         })
                 best_valid_loss = self.save_model(output_path, avg_loss_valid / batch_index, best_valid_loss, epoch)
 
+            if test_loader is not None and (epoch + 1) % test_epoch_interval == 0:
+                self.evaluate(
+                    test_loader=test_loader, 
+                    scaler=1, 
+                    foldername=foldername
+                )
+
         if self.save_strategy == "new":
             best_valid_loss = self.save_model(output_path, best_valid_loss, best_valid_loss, self.epochs)
             torch.save(self.model.state_dict(), output_path)
@@ -133,10 +149,6 @@ class Process(object):
         if self.save_strategy == "best":
             if current_valid_loss < best_valid_loss:
                 best_valid_loss = current_valid_loss
-                self.info["save"] = {
-                    "save strategy": "best",
-                    "epoch": epoch
-                }
                 print("\nBest loss updated to", best_valid_loss, "at epoch", epoch)
                 torch.save(self.model.state_dict(), save_path)
         elif self.save_strategy == "new":
@@ -149,7 +161,7 @@ class Process(object):
             torch.save(self.model.state_dict(), epoch_output_path)
         else:
             # 什么也不保存
-            pass
+            return best_valid_loss
         self.info["save"] = {
             "save strategy": self.save_strategy,
             "epoch": epoch
@@ -270,6 +282,11 @@ class Process(object):
                     print("MAPE:", mape_total / evalpoints_total)
                     print("CRPS:", CRPS)
                     print("CRPS_sum:", CRPS_sum)
+                self.info["test"].append({
+                    "RMSE": np.sqrt(mse_total / evalpoints_total),
+                    "MAE": mae_total / evalpoints_total,
+                    "MAPE": mape_total / evalpoints_total
+                })
 
 def quantile_loss(target, forecast, q: float, eval_points) -> float:
     return 2 * torch.sum(

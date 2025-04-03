@@ -158,6 +158,7 @@ if args.modelfolder == "":
     model_process.train(
         train_loader=train_loader,
         valid_loader=valid_loader,
+        test_loader=test_loader,
         foldername=foldername,
     )
 else:

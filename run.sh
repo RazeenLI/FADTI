@@ -1,6 +1,7 @@
 #!/bin/bash
+mkdir -p logs
 # 示例参数数组，可根据需要修改
-models=("csdi_ori" "ftcsdi")
+models=("csdi_ori" "csdi" "ftcsdi")
 datas=("ett")
 nfolds=(0 1 2 3 4)
 # nsample 和 device 可以直接定义

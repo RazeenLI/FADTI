@@ -18,33 +18,33 @@ def sample_mask(
     if rng is None:
         rng = np.random
 
-    # 假设 observed_masks 的第一维代表不同的数据样本，shape = (N, ...)
-    masks_list = []
-    for i in range(observed_masks.shape[0]):
-        masks_list.append(create_gt_mask(observed_masks[i], missing_ratio=missing_ratio, rng=rng))
+    # # 假设 observed_masks 的第一维代表不同的数据样本，shape = (N, ...)
+    # masks_list = []
+    # for i in range(observed_masks.shape[0]):
+    #     masks_list.append(create_gt_mask(observed_masks[i], missing_ratio=missing_ratio, rng=rng))
 
-    masks = np.stack(masks_list, axis=0)
+    # masks = np.stack(masks_list, axis=0)
 
-    return masks.astype("uint8")
+    # return masks.astype("uint8")
 
-    # shape = observed_masks.shape
-    # min_seq, max_seq = 12, 12 * 4
-    # p = 0
-    # p_noise = missing_ratio
-    # mask = rng.random(shape) < p
-    # for col in range(mask.shape[1]):
-    #     idxs = np.flatnonzero(mask[:, col])
-    #     if not len(idxs):
-    #         continue
-    #     fault_len = min_seq
-    #     if max_seq > min_seq:
-    #         fault_len = fault_len + int(rng.randint(max_seq - min_seq))
-    #     idxs_ext = np.concatenate([np.arange(i, i + fault_len) for i in idxs])
-    #     idxs = np.unique(idxs_ext)
-    #     idxs = np.clip(idxs, 0, shape[0] - 1)
-    #     mask[idxs, col] = True
-    # mask = mask | (rng.random(mask.shape) < p_noise)
-    # return mask.astype("uint8")
+    shape = observed_masks.shape
+    min_seq, max_seq = 12, 12 * 4
+    p = 0
+    p_noise = missing_ratio
+    mask = rng.random(shape) < p
+    for col in range(mask.shape[1]):
+        idxs = np.flatnonzero(mask[:, col])
+        if not len(idxs):
+            continue
+        fault_len = min_seq
+        if max_seq > min_seq:
+            fault_len = fault_len + int(rng.randint(max_seq - min_seq))
+        idxs_ext = np.concatenate([np.arange(i, i + fault_len) for i in idxs])
+        idxs = np.unique(idxs_ext)
+        idxs = np.clip(idxs, 0, shape[0] - 1)
+        mask[idxs, col] = True
+    mask = mask | (rng.random(mask.shape) < p_noise)
+    return mask.astype("uint8")
 
 
 def data_normalize(observed_values, observed_masks, num_features):

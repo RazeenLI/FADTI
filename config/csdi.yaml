@@ -19,7 +19,7 @@ model:
   target_strategy: "random"
 
 train:
-  epochs: 200
+  epochs: 500
   lr: 1.0e-3
   itr_per_epoch: 1.0e+8
   save_strategy: "best"

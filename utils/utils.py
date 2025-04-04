@@ -44,7 +44,8 @@ def sample_mask(
         idxs = np.clip(idxs, 0, shape[0] - 1)
         mask[idxs, col] = True
     mask = mask | (rng.random(mask.shape) < p_noise)
-    return mask.astype("uint8")
+    gt_masks = (1 - (mask | (1 - observed_masks)))
+    return gt_masks.astype("uint8")
 
 
 def data_normalize(observed_values, observed_masks, num_features):

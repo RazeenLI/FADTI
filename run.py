@@ -21,6 +21,7 @@ parser.add_argument("--modelfolder", type=str, default="")
 parser.add_argument("--nsample", type=int, default=100)
 parser.add_argument("--nfold", type=int, default=0) # for 5fold test (valid value:[0-4])
 parser.add_argument("--missrate", type=int, default=0.1) # 0.1 0.5
+parser.add_argument("--misspattern", type=str, default='point') # point block time
 
 args = parser.parse_args()
 print(args)

@@ -1,4 +1,5 @@
 import numpy as np
+import sys
 import torch
 from torch.optim import AdamW, SGD
 from tqdm import tqdm
@@ -47,6 +48,7 @@ class Process(object):
             "valid": [],
             "test": []
         }
+        self.disable_tqdm = not sys.stdout.isatty()
     
     def train(
             self,
@@ -64,7 +66,7 @@ class Process(object):
             avg_loss = 0
             # epoch_train_loss_collector = []
             self.model.train()
-            with tqdm(train_loader, mininterval=5.0, maxinterval=50.0) as it:
+            with tqdm(train_loader, mininterval=5.0, maxinterval=50.0, disable=self.disable_tqdm) as it:
                 for batch_index, batch_data in enumerate(it, start=1):
                     # def closure():
                     #     # it.write(f"Inside closure for batch {batch_index}")
@@ -107,7 +109,7 @@ class Process(object):
                 self.model.eval()
                 avg_loss_valid = 0
                 with torch.no_grad():
-                    with tqdm(valid_loader, mininterval=5.0, maxinterval=50.0) as it:
+                    with tqdm(valid_loader, mininterval=5.0, maxinterval=50.0, disable=self.disable_tqdm) as it:
                         for batch_index, valid_batch in enumerate(it, start=1):
                             loss = self.model(valid_batch)
                             avg_loss_valid += loss.item()
@@ -179,7 +181,7 @@ class Process(object):
             all_observed_time = []
             all_evalpoint = []
             all_generated_samples = []
-            with tqdm(test_loader, mininterval=5.0, maxinterval=50.0) as it:
+            with tqdm(test_loader, mininterval=5.0, maxinterval=50.0, disable=self.disable_tqdm) as it:
                 for batch_index, batch_data in enumerate(it, start=1):
                     output = self.model.evaluate(batch_data, nsample)
 

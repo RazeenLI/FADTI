@@ -13,10 +13,15 @@ def create_gt_mask(single_mask, missing_ratio=0.1, rng=None):
 def sample_mask(
     observed_masks, 
     missing_ratio=0.05, 
-    rng=None
+    rng=None,
+    missing_pattern='point'
 ):  # block missing, point missing
     if rng is None:
-        rng = np.random
+        random = np.random.random
+        randint = np.random.randint
+    else:
+        random = rng.random
+        randint = rng.integers
 
     # # 假设 observed_masks 的第一维代表不同的数据样本，shape = (N, ...)
     # masks_list = []
@@ -26,24 +31,30 @@ def sample_mask(
     # masks = np.stack(masks_list, axis=0)
 
     # return masks.astype("uint8")
-
     shape = observed_masks.shape
-    min_seq, max_seq = 12, 12 * 4
-    p = 0
     p_noise = missing_ratio
-    mask = rng.random(shape) < p
-    for col in range(mask.shape[1]):
-        idxs = np.flatnonzero(mask[:, col])
-        if not len(idxs):
-            continue
-        fault_len = min_seq
-        if max_seq > min_seq:
-            fault_len = fault_len + int(rng.randint(max_seq - min_seq))
-        idxs_ext = np.concatenate([np.arange(i, i + fault_len) for i in idxs])
-        idxs = np.unique(idxs_ext)
-        idxs = np.clip(idxs, 0, shape[0] - 1)
-        mask[idxs, col] = True
-    mask = mask | (rng.random(mask.shape) < p_noise)
+
+    if missing_pattern == 'time':
+        batch_size, num_time, num_feature = shape
+        mask_a = random((batch_size, num_time)) < p_noise
+        mask = np.zeros(shape, dtype=bool)
+        mask[mask_a, :] = True
+    else:
+        min_seq, max_seq = 12, 12 * 4
+        p = missing_ratio if missing_pattern == 'block' else 0
+        mask = random(shape) < p
+        for col in range(mask.shape[1]):
+            idxs = np.flatnonzero(mask[:, col])
+            if not len(idxs):
+                continue
+            fault_len = min_seq
+            if max_seq > min_seq:
+                fault_len = fault_len + int(randint(max_seq - min_seq))
+            idxs_ext = np.concatenate([np.arange(i, i + fault_len) for i in idxs])
+            idxs = np.unique(idxs_ext)
+            idxs = np.clip(idxs, 0, shape[0] - 1)
+            mask[idxs, col] = True
+        mask = mask | (random(mask.shape) < p_noise)
     gt_masks = (1 - (mask | (1 - observed_masks)))
     return gt_masks.astype("uint8")
 

@@ -32,11 +32,13 @@ import numpy as np
 # from modeling.layers import *
 # from modeling.utils import masked_mae_cal
 from .layers import EncoderLayer, PositionalEncoding
+from nn.process_data import get_process_data
 
 
 class SAITS(nn.Module):
     def __init__(
         self,
+        data_name,
         n_groups,
         n_group_inner_layers,
         dim_time,
@@ -57,6 +59,7 @@ class SAITS(nn.Module):
         **kwargs
     ):
         super().__init__()
+        self.process_data = get_process_data(data_name)
         self.n_groups = n_groups
         self.n_group_inner_layers = n_group_inner_layers
         self.input_with_mask = input_with_mask # kwargs["input_with_mask"]
@@ -120,6 +123,7 @@ class SAITS(nn.Module):
         # X, masks = inputs["X"], inputs["missing_mask"]
         # the first DMSA block
         input_X_for_first = torch.cat([X, masks], dim=2) if self.input_with_mask else X
+        # print(f"\n\n\n{input_X_for_first.shape}\n{masks.shape}\n\n\n")
         input_X_for_first = self.embedding_1(input_X_for_first)
         enc_output = self.dropout(
             self.position_enc(input_X_for_first)
@@ -178,22 +182,25 @@ class SAITS(nn.Module):
             num_sampling_times=1,
         ):
         results = {}
-        if self.training:
-            # Training
-            res = self.process_data(inputs, self.device)
-            (
-                observed_data,
-                observed_mask,
-                observed_tp,
-                gt_mask,
-                # for_pattern_mask,
-            ) = (
-                res["observed_data"],
-                res["observed_mask"],
-                res["observed_tp"],
-                res["gt_mask"],
-                # res["for_pattern_mask"],
-            )
+        # if self.training:
+        # Training
+        res = self.process_data(inputs, self.device)
+        (
+            observed_data,
+            observed_mask,
+            observed_tp,
+            gt_mask,
+            # for_pattern_mask,
+        ) = (
+            res["observed_data"],
+            res["observed_mask"],
+            res["observed_tp"],
+            res["gt_mask"],
+            # res["for_pattern_mask"],
+        )
+        observed_data = observed_data.permute(0, 2, 1)
+        observed_mask = observed_mask.permute(0, 2, 1)
+        gt_mask = gt_mask.permute(0, 2, 1)
         # X, masks = inputs["X"], inputs["missing_mask"]
         reconstruction_loss = 0
         total_input = observed_data * gt_mask
@@ -207,7 +214,7 @@ class SAITS(nn.Module):
 
         if (self.MIT or not self.training):
             # have to cal imputation loss in the val stage
-            indicating_mask = (1 - gt_mask) & observed_mask
+            indicating_mask = observed_mask - gt_mask
 
             imputation_MAE = masked_mae_cal(
                 X_tilde_3, observed_data, indicating_mask
@@ -245,6 +252,9 @@ class SAITS(nn.Module):
             res["gt_mask"],
             res["cut_length"],
         )
+        observed_data = observed_data.permute(0, 2, 1)
+        observed_mask = observed_mask.permute(0, 2, 1)
+        gt_mask = gt_mask.permute(0, 2, 1)
         # reconstruction_loss = 0
         total_input = observed_data * gt_mask
         imputed_data, _ = self.impute(X=total_input, masks=observed_mask)
@@ -253,6 +263,9 @@ class SAITS(nn.Module):
 
         for i in range(len(cut_length)):  # to avoid double evaluation
             target_mask[i, ..., 0 : cut_length[i].item()] = 0
+
+        # for process
+        imputed_data = imputed_data.unsqueeze(1)
 
         return imputed_data, observed_data, target_mask, observed_mask, observed_tp
 

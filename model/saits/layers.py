@@ -53,9 +53,9 @@ class MultiHeadAttention(nn.Module):
     def __init__(self, num_heads, dim_model, dim_k, dim_v, attn_dropout):
         super().__init__()
 
-        self.n_head = n_head
-        self.d_k = d_k
-        self.d_v = d_v
+        self.n_head = num_heads
+        self.d_k = dim_k
+        self.d_v = dim_v
 
         self.w_qs = nn.Linear(dim_model, num_heads * dim_k, bias=False)
         self.w_ks = nn.Linear(dim_model, num_heads * dim_k, bias=False)

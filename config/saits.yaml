@@ -1,7 +1,6 @@
 #type: args
 
 model:
-  [model]
   # whether concat input with missing mask
   input_with_mask: True
   # num of layer groups
@@ -37,3 +36,5 @@ train:
   save_strategy: "best"
   optimizer_type: "adam"
   lr_scheduler:
+
+diffusion:

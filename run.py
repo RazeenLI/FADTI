@@ -1,6 +1,7 @@
-# python run.py --model "ftcsdi" --data "ett" --nsample 100 --nfold 0 --missrate 0.1 --misspattern "point" --device "cuda:6"
+# python run.py --model "ftcsdi" --data "ett" --nsample 100 --nfold 0 --missrate 0.1 --misspattern "point" --device "cuda:6" --modelfolder "ftcsdi_ett_point_0.1_20250404_085422"
+# python run.py --model "saits" --data "ett" --nsample 100 --nfold 0 --missrate 0.1 --misspattern "point" --device "cuda:6" --modelfolder "saits_ett_time_0.5_20250410_103809"
 # python run.py --model "csdi" --data "ett" --nsample 100 --nfold 0 --device "cuda:5"
-# python run.py --model "csdi_ori" --data "ett" --nsample 100 --nfold 0 --device "cuda:4"
+# python run.py --model "csdi_ori" --data "ett" --nsample 100 --nfold 0 --device "cuda:4" 
 import argparse
 import torch
 import datetime
@@ -20,7 +21,7 @@ parser.add_argument('--device', default='cuda:0', help='Device for Attack')
 parser.add_argument("--modelfolder", type=str, default="")
 parser.add_argument("--nsample", type=int, default=100)
 parser.add_argument("--nfold", type=int, default=0) # for 5fold test (valid value:[0-4])
-parser.add_argument("--missrate", type=int, default=0.1) # 0.1 0.5
+parser.add_argument("--missrate", type=float, default=0.1) # 0.1 0.5
 parser.add_argument("--misspattern", type=str, default='point') # point block time
 
 args = parser.parse_args()
@@ -52,7 +53,6 @@ if args.data == "physio":
         missing_pattern=args.misspattern, # config["data"]["missing_pattern"],
         num_steps=config["data"]["num_steps"],
     )
-    data_info = config["data"]["missing_pattern"] + "_" + str(config["data"]["test_missing_ratio"])
 elif args.data == "ett":
     from dataset.ett import get_dataloader
     train_loader, valid_loader, test_loader = get_dataloader(
@@ -63,7 +63,6 @@ elif args.data == "ett":
         missing_pattern=args.misspattern, # config["data"]["missing_pattern"],
         num_steps=config["data"]["num_steps"],
     )
-    data_info = config["data"]["missing_pattern"] + "_" + str(config["data"]["test_missing_ratio"])
 elif args.data == "weather":
     from dataset.weather import get_dataloader
     train_loader, valid_loader, test_loader = get_dataloader(
@@ -74,7 +73,8 @@ elif args.data == "weather":
         missing_pattern=args.misspattern, # config["data"]["missing_pattern"],
         num_steps=config["data"]["num_steps"],
     )
-    data_info = config["data"]["missing_pattern"] + "_" + str(config["data"]["test_missing_ratio"])
+    
+data_info = args.misspattern + "_" + str(args.missrate)
 
 # Load Model
 if args.model == "csdi":
@@ -142,6 +142,7 @@ elif args.model == "saits":
     from model.saits.model import SAITS
     config_diff = config["diffusion"]
     model = SAITS(
+            data_name=args.data,
             n_groups=config["model"]['n_groups'],
             n_group_inner_layers=config["model"]['n_group_inner_layers'],
             dim_time=config["data"]["num_steps"],#config["model"]['n_groups'],

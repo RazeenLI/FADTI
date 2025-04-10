@@ -1,0 +1,39 @@
+#type: args
+
+model:
+  [model]
+  # whether concat input with missing mask
+  input_with_mask: True
+  # num of layer groups
+  n_groups: 2
+  # num of group-inner layers
+  n_group_inner_layers: 1
+  # how to share parameters, inner_group/between_group
+  param_sharing_strategy: "inner_group"
+  # model hidden dim
+  dim_model: 256
+  # hidden size of feed forward layer
+  dim_hidden: 128
+  # head num of self-attention
+  num_heads: 4
+  # key dim
+  dim_k: 64
+  # value dim
+  dim_v: 64
+  # drop out rate
+  dropout: 0.1
+  # whether to apply diagonal attention mask
+  diagonal_attention_mask: True
+  reconstruction_loss_weight: 1
+  # weight for imputation loss
+  imputation_loss_weight: 1
+  # whether to have Masked Imputation Task (MIT) in training
+  MIT: True
+
+train:
+  epochs: 500
+  lr: 0.001
+  itr_per_epoch: 1.0e+8
+  save_strategy: "best"
+  optimizer_type: "adam"
+  lr_scheduler:

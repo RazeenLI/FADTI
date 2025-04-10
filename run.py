@@ -1,4 +1,4 @@
-# python run.py --model "ftcsdi" --data "ett" --nsample 100 --nfold 0 --device "cuda:6"
+# python run.py --model "ftcsdi" --data "ett" --nsample 100 --nfold 0 --missrate 0.1 --misspattern "point" --device "cuda:6"
 # python run.py --model "csdi" --data "ett" --nsample 100 --nfold 0 --device "cuda:5"
 # python run.py --model "csdi_ori" --data "ett" --nsample 100 --nfold 0 --device "cuda:4"
 import argparse
@@ -48,8 +48,8 @@ if args.data == "physio":
         seed=config["data"]["seed"],
         nfold=args.nfold,
         batch_size=config["data"]["batch_size"],
-        missing_ratio=config["data"]["test_missing_ratio"],
-        missing_pattern=config["data"]["missing_pattern"],
+        missing_ratio=args.missrate, # config["data"]["test_missing_ratio"],
+        missing_pattern=args.misspattern, # config["data"]["missing_pattern"],
         num_steps=config["data"]["num_steps"],
     )
     data_info = config["data"]["missing_pattern"] + "_" + str(config["data"]["test_missing_ratio"])
@@ -59,8 +59,8 @@ elif args.data == "ett":
         seed=config["data"]["seed"],
         nfold=args.nfold,
         batch_size=config["data"]["batch_size"],
-        missing_ratio=config["data"]["test_missing_ratio"],
-        missing_pattern=config["data"]["missing_pattern"],
+        missing_ratio=args.missrate, # config["data"]["test_missing_ratio"],
+        missing_pattern=args.misspattern, # config["data"]["missing_pattern"],
         num_steps=config["data"]["num_steps"],
     )
     data_info = config["data"]["missing_pattern"] + "_" + str(config["data"]["test_missing_ratio"])
@@ -70,8 +70,8 @@ elif args.data == "weather":
         seed=config["data"]["seed"],
         nfold=args.nfold,
         batch_size=config["data"]["batch_size"],
-        missing_ratio=config["data"]["test_missing_ratio"],
-        missing_pattern=config["data"]["missing_pattern"],
+        missing_ratio=args.missrate, # config["data"]["test_missing_ratio"],
+        missing_pattern=args.misspattern, # config["data"]["missing_pattern"],
         num_steps=config["data"]["num_steps"],
     )
     data_info = config["data"]["missing_pattern"] + "_" + str(config["data"]["test_missing_ratio"])
@@ -136,6 +136,28 @@ elif args.model == "ftcsdi":
             beta_start=config_diff["beta_start"],
             beta_end=config_diff["beta_end"],
             target_strategy=config["model"]["target_strategy"],
+            device=args.device,
+        )
+elif args.model == "saits":
+    from model.saits.model import SAITS
+    config_diff = config["diffusion"]
+    model = SAITS(
+            n_groups=config["model"]['n_groups'],
+            n_group_inner_layers=config["model"]['n_group_inner_layers'],
+            dim_time=config["data"]["num_steps"],#config["model"]['n_groups'],
+            dim_feature=config["data"]["num_features"],#=config["model"]['n_groups'],
+            dim_model=config["model"]['dim_model'],
+            dim_hidden=config["model"]['dim_hidden'],
+            num_heads=config["model"]['num_heads'], # num_heads
+            dim_k=config["model"]['dim_k'],
+            dim_v=config["model"]['dim_v'],
+            dropout=config["model"]['dropout'],
+            reconstruction_loss_weight=config["model"]['reconstruction_loss_weight'],
+            imputation_loss_weight=config["model"]['imputation_loss_weight'],
+            diagonal_attention_mask=config["model"]['diagonal_attention_mask'],
+            param_sharing_strategy=config["model"]['param_sharing_strategy'],
+            input_with_mask=config["model"]['input_with_mask'],
+            MIT=config["model"]['MIT'],
             device=args.device,
         )
 

@@ -1,7 +1,7 @@
 import numpy as np
 import sys
 import torch
-from torch.optim import AdamW, SGD
+from torch.optim import AdamW, SGD, Adam
 from tqdm import tqdm
 from typing import Union, Optional
 import pickle
@@ -17,7 +17,8 @@ class Process(object):
             epochs: int = 100,
             batch_size: int = 32,
             patience: Optional[int] = None,
-            save_strategy="new" # "new", "best", "none", "all"
+            save_strategy="new", # "new", "best", "none", "all"
+            optimizer_type="adamw"
         ):
         super().__init__()
         self.device = device
@@ -32,7 +33,10 @@ class Process(object):
         self.model = model.to(self.device)
         
         # set up optimizer
-        self.optimizer = AdamW(self.model.parameters(), lr=learning_rate, weight_decay=1e-6)
+        if optimizer_type == "adamw":
+            self.optimizer = AdamW(self.model.parameters(), lr=learning_rate, weight_decay=1e-6)
+        elif optimizer_type == "adam":
+            self.optimizer = Adam(self.model.parameters(), lr=learning_rate, weight_decay=1e-6)
         # self.optimizer = SGD(self.model.parameters(), momentum=0.9, lr=learning_rate, weight_decay=1e-6)
         # base_optimizer = AdamW
         # self.optimizer = SAM(self.model.parameters(), base_optimizer, lr=learning_rate, weight_decay=1e-6)
@@ -185,7 +189,7 @@ class Process(object):
                 for batch_index, batch_data in enumerate(it, start=1):
                     output = self.model.evaluate(batch_data, nsample)
 
-                    samples, c_target, eval_points, observed_points, observed_time = output
+                    samples, c_target, eval_points, observed_points, observed_time = output # samples, observed_data, target_mask, observed_mask, observed_tp
                     
                     samples = samples.permute(0, 1, 3, 2)  # (B,nsample,L,K)
                     c_target = c_target.permute(0, 2, 1)  # (B,L,K)

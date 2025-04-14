@@ -4,7 +4,8 @@ mkdir -p logs
 methods=("ftcsdi" "ftcsdi_frsst" "ftcsdi_fsst")
 # ("csdi_ori" "csdi" "ftcsdi" "saits")
 datas=("ett")
-nfolds=(0 1 2 3 4)
+nfolds=(0)
+# nfolds=(0 1 2 3 4)
 missrates=(0.1 0.5)
 misspatterns=("point" "time")
 # nsample 和 device 可以直接定义

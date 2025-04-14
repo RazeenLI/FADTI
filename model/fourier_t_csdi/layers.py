@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from nn.transformer import TransformerEncoder_QKV, TransformerEncoderLayer_QKV
-from nn.fourier import FourierBasisMapping
+from nn.fourier import FourierBasisMapping, SpectralReprModule
 
 def get_transformer(num_heads=8, num_layers=1, num_channels=64):
     encoder_layer = TransformerEncoderLayer_QKV(
@@ -98,10 +98,9 @@ class TemporalAttention(nn.Module):
             num_channels, 
             num_heads, 
             num_steps,
+            method=None,
             num_layers=1,
             is_cross=False,
-            init_cutoff_ratio=0.5,
-            apply_ifft=True,
         ):
         super().__init__()
         self.is_cross = is_cross
@@ -110,9 +109,10 @@ class TemporalAttention(nn.Module):
             num_layers=num_layers, 
             num_channels=num_channels
         )
-        self.fft_layer = FourierBasisMapping(
+        self.fft_layer = SpectralReprModule(
             context_window=num_steps,
             target_window=num_steps,
+            method=method
         )
         self.fusion_layer = nn.Linear(num_channels * 2, num_channels)
         # self.norm = nn.LayerNorm(num_channels)  # 针对每个时间步内的 channel 归一化
@@ -191,6 +191,7 @@ class ResidualBlock(nn.Module):
             num_channels,
             num_heads,
             num_steps,
+            method=None,
     ):
         super().__init__()
         self.diffusion_projection_layer = nn.Linear(dim_diffusion_embedding, num_channels)
@@ -207,6 +208,7 @@ class ResidualBlock(nn.Module):
             num_layers=1,
             num_channels=num_channels,
             num_steps=num_steps,
+            method=method
         )
         self.feature_layer = FeatureAttention(
             num_heads=num_heads,
@@ -259,6 +261,7 @@ class DiffusionFTCSDI(nn.Module):
             num_heads,
             num_layers,
             num_steps,
+            method,
     ):
         super().__init__()
 
@@ -284,6 +287,7 @@ class DiffusionFTCSDI(nn.Module):
                     num_channels=num_channels,
                     num_heads=num_heads,
                     num_steps=num_steps,
+                    method=method,
                 )
                 for _ in range(num_layers)
             ]

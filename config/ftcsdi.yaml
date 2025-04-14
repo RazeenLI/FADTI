@@ -17,6 +17,7 @@ model:
   timeemb: 128
   featureemb: 16
   target_strategy: "random"
+  method: "fbm"
 
 train:
   epochs: 500

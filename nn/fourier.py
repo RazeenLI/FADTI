@@ -79,59 +79,37 @@ class FBMLinear(nn.Module):
         x = self.linear_layer(x)
         return x
     
-
-class FBMMLP(nn.Module):
+class SpectralConv1dLinear(nn.Module):
     def __init__(
-            self,
-            context_window,
-            target_window
-    ):
+            self, 
+            in_channels, 
+            out_channels, 
+            context_window, 
+            target_window, 
+            modes=16, 
+            dropout=0.1
+        ):
         super().__init__()
+        self.modes = modes
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.context_window = context_window
+        self.target_window = target_window
 
-        sr = context_window
-        ts = 1.0/sr
-        t = np.arange(0, 1, ts)
-        t = torch.tensor(t)
-        
-        for i in range(context_window//2+1):
-            if i == 0:
-                cos = 0.5 * torch.cos(2 * math.pi * i * t).unsqueeze(0)
-                sin = -0.5 * torch.sin(2 * math.pi * i * t).unsqueeze(0)
-            else:
-                cos = torch.vstack([cos, torch.cos(2 * math.pi * i * t).unsqueeze(0)])
-                sin = torch.vstack([sin, -torch.sin(2 * math.pi * i * t).unsqueeze(0)])
+        self.weights = nn.Parameter(torch.randn(in_channels, out_channels, self.modes, dtype=torch.cfloat))
+        self.dropout = nn.Dropout(p=dropout)
+        self.linear = nn.Linear(context_window, target_window)
 
-        self.cos = nn.Parameter(cos.float(), requires_grad=False)
-        self.sin = nn.Parameter(sin.float(), requires_grad=False)
+    def forward(self, x):
+        # x: (B, C, T)
+        x_ft = torch.fft.rfft(x, dim=-1)  # (B, C, F)
+        out_ft = torch.zeros(x.size(0), self.out_channels, x_ft.shape[-1], dtype=torch.cfloat, device=x.device)
+        out_ft[:, :, :self.modes] = torch.einsum('bci,cio->bio', x_ft[:, :, :self.modes], self.weights)
 
-        linear_input = context_window * (context_window // 2 + 1)
-
-        self.flatten_layer = nn.Flatten(start_dim=-2)
-        self.linear_layer = nn.Sequential(
-            nn.Linear(linear_input,720*2),      
-            nn.Dropout(p=0.15),
-            nn.ReLU(),
-            nn.Linear(720*2, 720*2),
-            nn.Dropout(p=0.15),
-            nn.ReLU(),
-            nn.Linear(720*2, target_window)
-        ) 
-
-    def forward(
-            self,
-            x
-    ):
-        norm = x.size()[-1]
-        frequency = torch.fft.rfft(x, axis=-1)
-        x = frequency/(norm)*2
-        basis_cos=torch.einsum('bkp,pt->bkpt', x.real, self.cos)
-        basis_sin=torch.einsum('bkp,pt->bkpt', x.imag, self.sin)
-
-        x = basis_cos + basis_sin
-        x = self.flatten_layer(x)
-        x = self.linear_layer(x)
-        
-        return x
+        x_time = torch.fft.irfft(out_ft, n=self.context_window, dim=-1)  # (B, C_out, T)
+        x_time = self.dropout(x_time)
+        x_time = x_time.permute(0, 2, 1)  # (B, T, C_out)
+        return self.linear(x_time)  # (B, T, target_window)
         
 
 class FourierBasisMapping(nn.Module):
@@ -165,3 +143,139 @@ class FourierBasisMapping(nn.Module):
         x = x.permute(0, 2, 1)
 
         return x
+
+class FSSTLike(nn.Module):
+    def __init__(self, in_channels, time_steps, num_freqs=64, kernel_size=31):
+        super().__init__()
+        self.num_freqs = num_freqs
+        self.time_steps = time_steps
+
+        # 类似 STFT 的卷积滤波器（固定频率分量）
+        self.freq_filters = nn.Conv1d(
+            in_channels=in_channels,
+            out_channels=num_freqs,
+            kernel_size=kernel_size,
+            padding=kernel_size // 2,
+            groups=in_channels,
+            bias=False
+        )
+        self._init_freq_filters()
+
+        # 软 squeeze 操作（替代 synchrosqueezing）
+        self.squeezer = nn.Sequential(
+            nn.Conv1d(num_freqs, num_freqs, kernel_size=1),
+            nn.ReLU(),
+            nn.Conv1d(num_freqs, num_freqs, kernel_size=1),
+            nn.Softmax(dim=1)
+        )
+
+        # flatten 投影为向量（可替换为 Transformer）
+        self.output_proj = nn.Linear(num_freqs * time_steps, time_steps)
+
+    def _init_freq_filters(self):
+        with torch.no_grad():
+            t = torch.linspace(-1, 1, self.freq_filters.kernel_size).unsqueeze(0)  # shape (1, K)
+            for i in range(self.num_freqs):
+                freq = (i + 1) * math.pi
+                kernel = torch.cos(freq * t)
+                self.freq_filters.weight[i::self.num_freqs] = kernel
+
+    def forward(self, x):
+        # x: (B, C, T)
+        B, C, T = x.shape
+        x = self.freq_filters(x)               # (B, num_freqs, T)
+        x = x * self.squeezer(x)               # frequency squeeze
+        x = x.view(B, -1)                      # (B, num_freqs * T)
+        x = self.output_proj(x)                # (B, T)
+        return x
+
+class FrSSTLike(nn.Module):
+    def __init__(self, in_channels, time_steps, num_freqs=64, alpha=0.7, kernel_size=31):
+        super().__init__()
+        self.num_freqs = num_freqs
+        self.time_steps = time_steps
+        self.alpha = alpha
+        self.kernel_size = kernel_size
+
+        self.frft_filters = nn.Conv1d(
+            in_channels=in_channels,
+            out_channels=num_freqs,
+            kernel_size=kernel_size,
+            padding=kernel_size // 2,
+            groups=in_channels,
+            bias=False
+        )
+        self._init_frft_filters(alpha)
+
+        self.squeezer = nn.Sequential(
+            nn.Conv1d(num_freqs, num_freqs, kernel_size=1),
+            nn.ReLU(),
+            nn.Conv1d(num_freqs, num_freqs, kernel_size=1),
+            nn.Softmax(dim=1)
+        )
+
+        self.output_proj = nn.Linear(num_freqs * time_steps, time_steps)
+
+    def _init_frft_filters(self, alpha):
+        B = torch.arange(self.kernel_size).float()
+        center = (self.kernel_size - 1) / 2.0
+        t = B - center  # 中心对称
+
+        chirps = []
+        for i in range(self.num_freqs):
+            omega = (i + 1) * math.pi / self.kernel_size
+            real = torch.cos(alpha * t**2 + omega * t).unsqueeze(0)
+            chirps.append(real)
+        chirps = torch.stack(chirps, dim=0)  # (num_freqs, 1, K)
+        self.frft_filters.weight.data = chirps.repeat(self.frft_filters.in_channels, 1, 1)
+
+    def forward(self, x):
+        # x: (B, C, T)
+        B, C, T = x.shape
+        x = self.frft_filters(x)               # (B, num_freqs, T)
+        x = x * self.squeezer(x)               # frequency reassignment
+        x = x.view(B, -1)                      # (B, num_freqs * T)
+        x = self.output_proj(x)                # (B, T)
+        return x
+
+
+class SpectralReprModule(nn.Module):
+    def __init__(self, context_window, target_window, method="fbm"):
+        super().__init__()
+        self.decomposer_layer = SeriesDecomposer(kernel_size=25)
+
+        if method == "frsst":
+            self.res_layer = FrSSTLike(
+                in_channels=context_window,
+                time_steps=target_window
+            )
+            self.trend_layer = FrSSTLike(
+                in_channels=context_window,
+                time_steps=target_window
+            )
+        elif method == "fsst":
+            self.res_layer = FSSTLike(
+                in_channels=context_window,
+                time_steps=target_window
+            )
+            self.trend_layer = FSSTLike(
+                in_channels=context_window,
+                time_steps=target_window
+            )
+        else:
+            self.res_layer = FBMLinear(
+                context_window=context_window,
+                target_window=target_window
+            )
+            self.trend_layer = FBMLinear(
+                context_window=context_window,
+                target_window=target_window
+            )
+
+    def forward(self, x):
+        res, trend = self.decomposer_layer(x)
+        res = res.permute(0, 2, 1)
+        trend = trend.permute(0, 2, 1)
+        res = self.res_layer(res)
+        trend = self.trend_layer(trend)
+        return (res + trend).permute(0, 2, 1)

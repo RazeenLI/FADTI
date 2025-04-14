@@ -1,4 +1,4 @@
-# python run.py --model "ftcsdi" --data "ett" --nsample 100 --nfold 0 --missrate 0.1 --misspattern "point" --device "cuda:6" --modelfolder "ftcsdi_ett_point_0.1_20250404_085422"
+# python run.py --model "ftcsdi" --data "ett" --nsample 100 --nfold 0 --missrate 0.1 --misspattern "point" --device "cuda:6" ----method "fbm" --modelfolder "ftcsdi_ett_point_0.1_20250404_085422"
 # python run.py --model "saits" --data "ett" --nsample 100 --nfold 0 --missrate 0.1 --misspattern "point" --device "cuda:6" --modelfolder "saits_ett_time_0.5_20250410_103809"
 # python run.py --model "csdi" --data "ett" --nsample 100 --nfold 0 --device "cuda:5"
 # python run.py --model "csdi_ori" --data "ett" --nsample 100 --nfold 0 --device "cuda:4" 
@@ -23,6 +23,7 @@ parser.add_argument("--nsample", type=int, default=100)
 parser.add_argument("--nfold", type=int, default=0) # for 5fold test (valid value:[0-4])
 parser.add_argument("--missrate", type=float, default=0.1) # 0.1 0.5
 parser.add_argument("--misspattern", type=str, default='point') # point block time
+parser.add_argument("--method", type=str, default='point') # point block time
 
 args = parser.parse_args()
 print(args)
@@ -136,6 +137,7 @@ elif args.model == "ftcsdi":
             beta_start=config_diff["beta_start"],
             beta_end=config_diff["beta_end"],
             target_strategy=config["model"]["target_strategy"],
+            method=args.method,
             device=args.device,
         )
 elif args.model == "saits":

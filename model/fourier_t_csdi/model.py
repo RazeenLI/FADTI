@@ -24,6 +24,7 @@ class FTCSDI(nn.Module):
             beta_start,
             beta_end,
             target_strategy,
+            method,
             device,
     ):
         super().__init__()
@@ -64,6 +65,7 @@ class FTCSDI(nn.Module):
             num_heads=num_heads,
             num_layers=num_layers,
             num_steps=num_steps,
+            method=method,
         )
 
         # Noise Paremeters for diffusion model

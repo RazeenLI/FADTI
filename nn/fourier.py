@@ -110,86 +110,7 @@ class SpectralConv1dLinear(nn.Module):
         x_time = self.dropout(x_time)
         x_time = x_time.permute(0, 2, 1)  # (B, T, C_out)
         return self.linear(x_time)  # (B, T, target_window)
-        
 
-class FourierBasisMapping(nn.Module):
-    def __init__(
-            self,
-            context_window,
-            target_window,
-            kernel_size=24,
-    ):
-        super().__init__()
-
-        self.decomposer_layer = SeriesDecomposer(kernel_size=kernel_size)
-        self.res_fbm_layer = FBMLinear(
-            context_window=context_window,
-            target_window=target_window
-        )
-        self.trend_fbm_layer = FBMLinear(
-            context_window=context_window,
-            target_window=target_window
-        )
-
-    def forward(
-            self,
-            x,
-    ):
-        res, trend = self.decomposer_layer(x)
-        res, trend = res.permute(0, 2, 1), trend.permute(0, 2, 1)
-        res = self.res_fbm_layer(res)
-        trend = self.trend_fbm_layer(trend)
-        x = res + trend
-        x = x.permute(0, 2, 1)
-
-        return x
-
-class FSSTLike(nn.Module):
-    def __init__(self, in_channels, time_steps, num_freqs=64, kernel_size=31):
-        super().__init__()
-        self.num_freqs = num_freqs
-        self.time_steps = time_steps
-
-        # 类似 STFT 的卷积滤波器（固定频率分量）
-        self.freq_filters = nn.Conv1d(
-            in_channels=in_channels,
-            out_channels=num_freqs,
-            kernel_size=kernel_size,
-            padding=kernel_size // 2,
-            groups=in_channels,
-            bias=False
-        )
-        self._init_freq_filters()
-
-        # 软 squeeze 操作（替代 synchrosqueezing）
-        self.squeezer = nn.Sequential(
-            nn.Conv2d(in_channels, num_freqs, kernel_size=1),
-            nn.ReLU(),
-            nn.Conv2d(in_channels, num_freqs, kernel_size=1),
-            nn.Softmax(dim=1)
-        )
-
-        # flatten 投影为向量（可替换为 Transformer）
-        self.output_proj = nn.Linear(num_freqs, 1)
-
-    def _init_freq_filters(self):
-        with torch.no_grad():
-            t = torch.linspace(-1, 1, self.freq_filters.kernel_size).unsqueeze(0)  # shape (1, K)
-            for i in range(self.num_freqs):
-                freq = (i + 1) * math.pi
-                kernel = torch.cos(freq * t)
-                self.freq_filters.weight[i::self.num_freqs] = kernel
-
-    def forward(self, x):
-        # x: (B, C, T)
-        B, C, T = x.shape
-        x = self.freq_filters(x)               # (B, num_freqs, T)
-        x = x.reshape(B, C, self.num_freqs, T)
-        x = x * self.squeezer(x)               # frequency squeeze
-        x = x.permute(0, 1, 3, 2) # (B, C, T, F)
-        x = self.output_proj(x)                # (B, T)
-        x = x.squeeze(-1)
-        return x
 
 class FrSSTLike(nn.Module):
     def __init__(self, in_channels, time_steps, num_freqs=64, alpha=0.7, kernel_size=31):
@@ -293,3 +214,36 @@ class SpectralReprModule(nn.Module):
         res = self.res_layer(res)
         trend = self.trend_layer(trend)
         return (res + trend).permute(0, 2, 1)
+
+
+class FourierBasisMapping(nn.Module):
+    def __init__(
+            self,
+            context_window,
+            target_window,
+            kernel_size=24,
+    ):
+        super().__init__()
+
+        self.decomposer_layer = SeriesDecomposer(kernel_size=kernel_size)
+        self.res_fbm_layer = FBMLinear(
+            context_window=context_window,
+            target_window=target_window
+        )
+        self.trend_fbm_layer = FBMLinear(
+            context_window=context_window,
+            target_window=target_window
+        )
+
+    def forward(
+            self,
+            x,
+    ):
+        res, trend = self.decomposer_layer(x)
+        res, trend = res.permute(0, 2, 1), trend.permute(0, 2, 1)
+        res = self.res_fbm_layer(res)
+        trend = self.trend_fbm_layer(trend)
+        x = res + trend
+        x = x.permute(0, 2, 1)
+
+        return x

@@ -1,7 +1,8 @@
 #!/bin/bash
+# nohup ./run_ftcsdi.sh > run.log 2>&1 & 
 mkdir -p logs
 # 示例参数数组，可根据需要修改
-methods=("ftcsdi" "ftcsdi_frsst" "ftcsdi_fsst")
+models=("ftcsdi" "ftcsdi_frsst" "ftcsdi_fsst")
 # ("csdi_ori" "csdi" "ftcsdi" "saits")
 datas=("ett")
 nfolds=(0)
@@ -21,7 +22,7 @@ for model in "${models[@]}"; do
                     # 构造输出文件名，可以根据需求修改命名规则
                     output_file="logs/${model}_${data}_${nfold}.out"
                     echo "Running: python run.py --model \"$model\" --data \"$data\" --nsample $nsample --device \"$device\" --nfold $nfold --misspattern \"$misspattern\" --missrate $missrate > $output_file"
-                    python run.py --model "ftcsdi" --data "$data" --nsample $nsample --device "$device" --nfold $nfold --misspattern "$misspattern" --missrate $missrate > "$output_file"
+                    python run.py --model "$model" --data "$data" --nsample $nsample --device "$device" --nfold $nfold --misspattern "$misspattern" --missrate $missrate > "$output_file"
                 done
             done
          done

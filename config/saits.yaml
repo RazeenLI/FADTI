@@ -12,15 +12,15 @@ model:
   # model hidden dim
   dim_model: 256
   # hidden size of feed forward layer
-  dim_hidden: 128
+  dim_hidden: 512
   # head num of self-attention
-  num_heads: 4
+  num_heads: 8
   # key dim
-  dim_k: 64
+  dim_k: 32
   # value dim
-  dim_v: 64
+  dim_v: 32
   # drop out rate
-  dropout: 0.1
+  dropout: 0
   # whether to apply diagonal attention mask
   diagonal_attention_mask: True
   reconstruction_loss_weight: 1

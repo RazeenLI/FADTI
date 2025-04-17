@@ -5,12 +5,13 @@
 # ftcsdi_ett_point_0.5_20250401_130308
 # ftcsdi_ett_point_0.5_20250401_221802
 # ftcsdi_ett_point_0.5_20250402_051641
+# saits_ett_point_0.5_20250411_030512
 import os
 import pickle
 import matplotlib.pyplot as plt
 
 
-file = "ftcsdi_ett_point_0.5_20250401_221802"
+file = "saits_ett_point_0.5_20250411_030512"
 
 model_ = file.split("_")[0]
 data_ = file.split("_")[1]

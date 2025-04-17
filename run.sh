@@ -1,4 +1,6 @@
 #!/bin/bash
+
+# nohup ./run.sh > run.log 2>&1 & 
 mkdir -p logs
 # 示例参数数组，可根据需要修改
 models=("saits")

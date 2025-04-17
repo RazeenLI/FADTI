@@ -30,6 +30,8 @@ print(args)
 
 # Load model config
 path = "config/" + args.model + ".yaml"
+if "ftcsdi" in args.model:
+    path = "config/ftcsdi.yaml"
 with open(path, "r") as f:
     config_model = yaml.safe_load(f)
 

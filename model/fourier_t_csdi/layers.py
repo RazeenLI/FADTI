@@ -112,6 +112,7 @@ class TemporalAttention(nn.Module):
         self.fft_layer = SpectralReprModule(
             context_window=num_steps,
             target_window=num_steps,
+            num_channels=num_channels,
             method=method
         )
         self.fusion_layer = nn.Linear(num_channels * 2, num_channels)

@@ -163,14 +163,14 @@ class FSSTLike(nn.Module):
 
         # 软 squeeze 操作（替代 synchrosqueezing）
         self.squeezer = nn.Sequential(
-            nn.Conv1d(num_freqs, num_freqs, kernel_size=1),
+            nn.Conv2d(in_channels, num_freqs, kernel_size=1),
             nn.ReLU(),
-            nn.Conv1d(num_freqs, num_freqs, kernel_size=1),
+            nn.Conv2d(in_channels, num_freqs, kernel_size=1),
             nn.Softmax(dim=1)
         )
 
         # flatten 投影为向量（可替换为 Transformer）
-        self.output_proj = nn.Linear(num_freqs * time_steps, time_steps)
+        self.output_proj = nn.Linear(num_freqs, 1)
 
     def _init_freq_filters(self):
         with torch.no_grad():
@@ -184,9 +184,11 @@ class FSSTLike(nn.Module):
         # x: (B, C, T)
         B, C, T = x.shape
         x = self.freq_filters(x)               # (B, num_freqs, T)
+        x = x.reshape(B, C, self.num_freqs, T)
         x = x * self.squeezer(x)               # frequency squeeze
-        x = x.view(B, -1)                      # (B, num_freqs * T)
+        x = x.permute(0, 1, 3, 2) # (B, C, T, F)
         x = self.output_proj(x)                # (B, T)
+        x = x.squeeze(-1)
         return x
 
 class FrSSTLike(nn.Module):
@@ -196,6 +198,7 @@ class FrSSTLike(nn.Module):
         self.time_steps = time_steps
         self.alpha = alpha
         self.kernel_size = kernel_size
+        # print("\n\n\n", in_channels, time_steps, num_freqs, alpha, kernel_size, "\n\n\n")
 
         self.frft_filters = nn.Conv1d(
             in_channels=in_channels,
@@ -208,13 +211,13 @@ class FrSSTLike(nn.Module):
         self._init_frft_filters(alpha)
 
         self.squeezer = nn.Sequential(
-            nn.Conv1d(num_freqs, num_freqs, kernel_size=1),
+            nn.Conv2d(in_channels, in_channels, kernel_size=1),
             nn.ReLU(),
-            nn.Conv1d(num_freqs, num_freqs, kernel_size=1),
-            nn.Softmax(dim=1)
+            nn.Conv2d(in_channels, in_channels, kernel_size=1),
+            nn.Softmax(dim=2)
         )
 
-        self.output_proj = nn.Linear(num_freqs * time_steps, time_steps)
+        self.output_proj = nn.Linear(num_freqs, 1)
 
     def _init_frft_filters(self, alpha):
         B = torch.arange(self.kernel_size).float()
@@ -233,34 +236,45 @@ class FrSSTLike(nn.Module):
         # x: (B, C, T)
         B, C, T = x.shape
         x = self.frft_filters(x)               # (B, num_freqs, T)
+        x = x.reshape(B, C, self.num_freqs, T)
         x = x * self.squeezer(x)               # frequency reassignment
-        x = x.view(B, -1)                      # (B, num_freqs * T)
+        x = x.permute(0, 1, 3, 2) # (B, C, T, F)
         x = self.output_proj(x)                # (B, T)
+        x = x.squeeze(-1)
         return x
 
 
 class SpectralReprModule(nn.Module):
-    def __init__(self, context_window, target_window, method="fbm"):
+    def __init__(
+            self, 
+            context_window, 
+            target_window, 
+            num_channels,
+            kernel_size=24,
+            method="fbm"
+        ):
         super().__init__()
-        self.decomposer_layer = SeriesDecomposer(kernel_size=25)
+        self.decomposer_layer = SeriesDecomposer(kernel_size=kernel_size)
 
         if method == "frsst":
             self.res_layer = FrSSTLike(
-                in_channels=context_window,
-                time_steps=target_window
+                in_channels=num_channels,
+                time_steps=context_window,
             )
             self.trend_layer = FrSSTLike(
-                in_channels=context_window,
-                time_steps=target_window
+                in_channels=num_channels,
+                time_steps=context_window,
             )
         elif method == "fsst":
-            self.res_layer = FSSTLike(
-                in_channels=context_window,
-                time_steps=target_window
+            self.res_layer = FrSSTLike(
+                in_channels=num_channels,
+                time_steps=context_window,
+                alpha=0,
             )
-            self.trend_layer = FSSTLike(
-                in_channels=context_window,
-                time_steps=target_window
+            self.trend_layer = FrSSTLike(
+                in_channels=num_channels,
+                time_steps=context_window,
+                alpha=0
             )
         else:
             self.res_layer = FBMLinear(

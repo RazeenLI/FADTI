@@ -131,8 +131,9 @@ class TemporalAttention(nn.Module):
         v_fft = v_fft.permute(1, 0, 2)
         v = torch.cat([v, v_fft], dim=-1)
         v = self.fusion_layer(v)
+        # print(f"\n\n\n{v.shape}\n\n\n")
 
-        x = input.permute(2, 0, 1) # batch_size * num_feature, num_channels, num_steps
+        v = v.permute(1, 2, 0) # batch_size * num_feature, num_channels, num_steps
         x = self.time_layer(v) # batch_size * num_feature, num_channels, num_steps
         # x = self.time_layer(v, v_fft, v_fft).permute(1, 2, 0)
         # x = v_fft.permute(0, 2, 1)

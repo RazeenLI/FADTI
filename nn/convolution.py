@@ -129,12 +129,12 @@ class GatedDilatedConvolution(nn.Module):
         for b in range(blocks):
             for i in range(layers):
                 dilation = 2 ** i
-                padding = (kernel_size - 1) * dilation
+                # padding = (kernel_size - 1) * dilation
 
                 self.filter_convs.append(nn.Conv1d(residual_channels, dilation_channels,
-                                                   kernel_size, dilation=dilation, padding=padding))
+                                                   kernel_size, dilation=dilation, padding="same"))
                 self.gate_convs.append(nn.Conv1d(residual_channels, dilation_channels,
-                                                 kernel_size, dilation=dilation, padding=padding))
+                                                 kernel_size, dilation=dilation, padding="same"))
                 self.residual_convs.append(nn.Conv1d(dilation_channels, residual_channels, kernel_size=1))
                 self.skip_convs.append(nn.Conv1d(dilation_channels, skip_channels, kernel_size=1))
                 self.bn.append(nn.BatchNorm1d(residual_channels))
@@ -167,7 +167,7 @@ class GatedDilatedConvolution(nn.Module):
             skip = skip + s
 
             x = self.residual_convs[i](x)
-            x = x + residual[:, :, -x.size(2):]
+            x = x + residual # [:, :, -x.size(2):]
             x = self.bn[i](x)
 
         x = F.relu(skip)

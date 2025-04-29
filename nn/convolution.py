@@ -111,14 +111,14 @@ class GatedDilatedConvolution(nn.Module):
             skip_channels=256,
             end_channels=512,
             kernel_size=2,
-            blocks=4,
-            layers=2
+            blocks=2,
+            layers=1
         ):
         super().__init__()
 
         self.receptive_field = 1 + sum([2 ** i for i in range(layers)] * blocks)
 
-        self.start_conv = nn.Conv1d(in_dim, residual_channels, kernel_size=1)
+        # self.start_conv = nn.Conv1d(in_dim, residual_channels, kernel_size=1)
 
         self.filter_convs = nn.ModuleList()
         self.gate_convs = nn.ModuleList()

@@ -101,14 +101,23 @@ class TemporalAttention(nn.Module):
             num_steps,
             method=None,
             num_layers=1,
-            is_cross=False,
+            type_layer="attn",
         ):
         super().__init__()
-        self.is_cross = is_cross
-        self.time_layer = GatedDilatedConvolution(
-            in_dim=num_channels,
-            out_dim=num_channels,
-        )
+
+        self.type_layer = type_layer
+
+        if self.type_layer == "attn":
+            self.time_layer = get_transformer(
+                num_heads=num_heads, 
+                num_layers=num_layers, 
+                num_channels=num_channels
+            )
+        else: # conv
+            self.time_layer = GatedDilatedConvolution(
+                in_dim=num_channels,
+                out_dim=num_channels,
+            )
         self.fft_layer = SpectralReprModule(
             context_window=num_steps,
             target_window=num_steps,
@@ -123,20 +132,25 @@ class TemporalAttention(nn.Module):
         
         if num_steps == 1:
             return x
+        
         # Time Domain
         v = x.reshape(batch_size, num_channels, num_features, num_steps).permute(0, 2, 1, 3).reshape(batch_size * num_features, num_channels, num_steps).permute(2, 0, 1)
+
         # Frequenct Domain
         v_fft = x.reshape(batch_size, num_channels, num_features, num_steps).permute(0, 2, 1, 3).reshape(batch_size * num_features, num_channels, num_steps).permute(0, 2, 1)
         v_fft = self.fft_layer(v_fft)
         v_fft = v_fft.permute(1, 0, 2)
+
+        # Fusion
         v = torch.cat([v, v_fft], dim=-1)
         v = self.fusion_layer(v)
-        # print(f"\n\n\n{v.shape}\n\n\n")
-
         v = v.permute(1, 2, 0) # batch_size * num_feature, num_channels, num_steps
-        x = self.time_layer(v) # batch_size * num_feature, num_channels, num_steps
-        # x = self.time_layer(v, v_fft, v_fft).permute(1, 2, 0)
-        # x = v_fft.permute(0, 2, 1)
+
+        # Attn | Conv
+        if self.type_layer == "attn":
+            x = self.time_layer(v, v, v).permute(1, 2, 0)
+        else:
+            x = self.time_layer(v) # batch_size * num_feature, num_channels, num_steps
 
         x = x.reshape(batch_size, num_features, num_channels, num_steps).permute(0, 2, 1, 3).reshape(batch_size, num_channels, num_features * num_steps)
         return x
@@ -148,10 +162,8 @@ class FeatureAttention(nn.Module):
             num_channels, 
             num_heads,
             num_layers=1, 
-            is_cross=False
         ):
         super().__init__()
-        self.is_cross = is_cross
         self.feature_layer = get_transformer(
             num_heads=num_heads, 
             num_layers=num_layers, 
@@ -162,14 +174,12 @@ class FeatureAttention(nn.Module):
         batch_size, num_channels, num_features, num_steps = base_shape
         if num_features == 1:
             return x
+        
         v = x.reshape(batch_size, num_channels, num_features, num_steps).permute(0, 3, 1, 2).reshape(batch_size * num_steps, num_channels, num_features).permute(2, 0, 1)
-        if self.is_cross:
-            q = itp_x.reshape(batch_size, num_channels, num_features, num_steps).permute(0, 3, 1, 2).reshape(batch_size * num_steps, num_channels, num_features).permute(2, 0, 1)
-            x = self.feature_layer(q, v, v).permute(1, 2, 0)
-            # x = self.feature_layer(v).permute(1, 2, 0)
-        else:
-            x = self.feature_layer(v, v, v).permute(1, 2, 0)
-            # x = self.feature_layer(v).permute(1, 2, 0)
+
+        x = self.feature_layer(v, v, v).permute(1, 2, 0)
+        # x = self.feature_layer(v).permute(1, 2, 0)
+
         x = x.reshape(batch_size, num_steps, num_channels, num_features).permute(0, 2, 3, 1).reshape(batch_size, num_channels, num_features * num_steps)
         return x
 
@@ -182,6 +192,7 @@ class ResidualBlock(nn.Module):
             num_heads,
             num_steps,
             method=None,
+            type_layer="attn",
     ):
         super().__init__()
         self.diffusion_projection_layer = nn.Linear(dim_diffusion_embedding, num_channels)
@@ -198,7 +209,8 @@ class ResidualBlock(nn.Module):
             num_layers=1,
             num_channels=num_channels,
             num_steps=num_steps,
-            method=method
+            method=method,
+            type_layer=type_layer,
         )
         self.feature_layer = FeatureAttention(
             num_heads=num_heads,
@@ -252,6 +264,7 @@ class DiffusionFADTI(nn.Module):
             num_layers,
             num_steps,
             method,
+            type_layer, # "attn" "conv" "atten+conv"
     ):
         super().__init__()
 
@@ -269,6 +282,8 @@ class DiffusionFADTI(nn.Module):
         # Makes the output relatively stable in the initial state, which helps the stability in the early stage of training.
         nn.init.zeros_(self.output_projection_layer2.weight)
 
+        type_layers = type_layer.split("+") 
+
         self.residual_layers = nn.ModuleList(
             [
                 ResidualBlock(
@@ -278,6 +293,7 @@ class DiffusionFADTI(nn.Module):
                     num_heads=num_heads,
                     num_steps=num_steps,
                     method=method,
+                    type_layer=type_layers[_ % len(type_layers)]
                 )
                 for _ in range(num_layers)
             ]

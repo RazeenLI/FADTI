@@ -153,3 +153,92 @@ class ETT_Dataset(Dataset):
 
     def __len__(self):
         return len(self.use_index_list)
+    
+
+def get_dataset(
+        nfold=None,
+        seed=1,
+        missing_pattern='block',
+        missing_ratio=0.0,
+        batch_size=16,
+        num_steps=96
+):
+    # get total dataset, if not exit, create new dataset
+    observed_values = get_data()
+    observed_masks = (~np.isnan(observed_values)).astype("uint8") # float32
+
+    # add random mask
+    rng = np.random.default_rng(seed)
+
+    gt_masks = sample_mask(
+        observed_masks=observed_masks,
+        missing_ratio=missing_ratio, 
+        rng=rng,
+        missing_pattern=missing_pattern
+    )
+    # gt_masks = (1 - (gt_masks | (1 - observed_masks))).astype('uint8')
+
+    print(
+        "Original missing ratio = {:.4f}\nArtificial missing pattern: {}\nOverall missing ratio = {:.4f}".format(
+            1 - np.sum(observed_masks) / observed_masks.size,
+            missing_pattern,
+            1 - np.sum(gt_masks) / gt_masks.size,
+        )
+    )
+
+    # data normalization
+    # observed_values = np.nan_to_num(observed_values)
+    # observed_values = data_normalize(observed_values, observed_masks, 7)
+    # devide into three dataloader and return 
+    dataset = ETT_Dataset(
+        observed_masks=observed_masks, 
+        observed_values=observed_values, 
+        gt_masks=gt_masks,
+        eval_length=num_steps
+    )
+    indlist = np.arange(len(dataset))
+
+    # 5-fold test
+    start = (int)(nfold * 0.2 * len(dataset))
+    end = (int)((nfold + 1) * 0.2 * len(dataset))
+    test_index = indlist[start:end]
+    remain_index = np.delete(indlist, np.arange(start, end))
+    # test_index = indlist[:2]
+    # remain_index = indlist[2:]
+
+    num_train = (int)(len(dataset) * 0.7)
+    train_index = remain_index[:num_train]
+    valid_index = remain_index[num_train:]
+
+
+    X_ori = observed_values[train_index]
+    gt_mask = gt_masks[train_index]
+    X = X_ori.copy()
+    X[gt_mask == 1] = np.nan
+    train_set = {
+        'X': X, 
+        'X_ori': X_ori,
+        'mask_X_gt': gt_mask
+    }
+
+    X_ori = observed_values[valid_index]
+    gt_mask = gt_masks[valid_index]
+    X = X_ori.copy()
+    X[gt_mask == 1] = np.nan
+    valid_set = {
+        'X': X,
+        'X_ori': X_ori, 
+        'mask_X_gt': gt_mask
+    }
+
+    X_ori = observed_values[test_index]
+    gt_mask = gt_masks[test_index]
+    X = X_ori.copy()
+    X[gt_mask == 1] = np.nan
+    test_set = {
+        'X': X,
+        'X_ori': X_ori,
+        'mask_X_gt': gt_mask
+    }
+
+    return train_set, valid_set, test_set

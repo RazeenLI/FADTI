@@ -25,6 +25,7 @@ class FADTI(nn.Module):
             beta_end,
             target_strategy,
             method,
+            type_layer, # "attn" "conv" "atten+conv"
             device,
     ):
         super().__init__()

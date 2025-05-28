@@ -1,4 +1,4 @@
-# python run.py --model "fadti" --ffttype "fbm" --timetype "attn" --data "ett" --nsample 100 --nfold 0 --missrate 0.1 --misspattern "point" --device "cuda:6" --modelfolder "ftcsdi_ett_point_0.1_20250404_085422"
+# python run.py --model "fadti" --ffttype "dft" --timetype "attn" --data "ett" --nsample 100 --nfold 0 --missrate 0.1 --misspattern "point" --device "cuda:6" --modelfolder "ftcsdi_ett_point_0.1_20250404_085422"
 # python run.py --model "saits" --data "ett" --nsample 100 --nfold 0 --missrate 0.1 --misspattern "point" --device "cuda:6" --modelfolder "saits_ett_time_0.5_20250410_103809"
 # python run.py --model "csdi" --data "ett" --nsample 100 --nfold 0 --device "cuda:5"
 # python run.py --model "csdi_ori" --data "ett" --nsample 100 --nfold 0 --device "cuda:4" 
@@ -18,7 +18,7 @@ parser = argparse.ArgumentParser(description="model and data")
 parser.add_argument("--model", type=str, default="csdi", help="Name of the model to use")
 parser.add_argument("--ffttype", type=str, default="fbm", help="Name of the model to use") # frsst fsst
 parser.add_argument("--timetype", type=str, default="attn", help="Name of the model to use") # attn conv attn+conv
-parser.add_argument("--model", type=str, default="csdi", help="Name of the model to use")
+# parser.add_argument("--model", type=str, default="csdi", help="Name of the model to use")
 
 parser.add_argument("--data", type=str, default="physio", help="Name of the dataset to use")
 parser.add_argument('--device', default='cuda:0', help='Device for Attack')
@@ -98,6 +98,8 @@ model = FADTI(
         device=args.device,
     )
 
+model_info = args.ffttype + "_" + args.timetype
+
 model_process = Process(
         model=model,
         learning_rate=config["train"]["lr"],
@@ -108,7 +110,7 @@ model_process = Process(
 
 # Create Save Place
 current_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-foldername = "./save/" + args.model + "_" + args.data + "_" + data_info + "_" + current_time + "/"
+foldername = "./save/" + args.model + "_" + model_info + "_" + args.data + "_" + data_info + "_" + current_time + "/"
 print('model folder:', foldername)
 os.makedirs(foldername, exist_ok=True)
 with open(foldername + "config.json", "w") as f:

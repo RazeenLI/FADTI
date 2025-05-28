@@ -142,14 +142,19 @@ class TemporalAttention(nn.Module):
         v_fft = v_fft.permute(1, 0, 2)
 
         # Fusion
+        # print("  → v shape:", v.shape)
+        # print("  → v_fft shape:", v.shape)
         v = torch.cat([v, v_fft], dim=-1)
         v = self.fusion_layer(v)
-        v = v.permute(1, 2, 0) # batch_size * num_feature, num_channels, num_steps
+    
+
+        # print("  → attn input shape:", v.shape)
 
         # Attn | Conv
         if self.type_layer == "attn":
             x = self.time_layer(v, v, v).permute(1, 2, 0)
         else:
+            v = v.permute(1, 2, 0) # batch_size * num_feature, num_channels, num_steps
             x = self.time_layer(v) # batch_size * num_feature, num_channels, num_steps
 
         x = x.reshape(batch_size, num_features, num_channels, num_steps).permute(0, 2, 1, 3).reshape(batch_size, num_channels, num_features * num_steps)
@@ -263,7 +268,7 @@ class DiffusionFADTI(nn.Module):
             num_heads,
             num_layers,
             num_steps,
-            method,
+            method, # "dft" "stft" "frsst"
             type_layer, # "attn" "conv" "atten+conv"
     ):
         super().__init__()

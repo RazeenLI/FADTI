@@ -24,7 +24,7 @@ class FADTI(nn.Module):
             beta_start,
             beta_end,
             target_strategy,
-            method,
+            method, # "dft" "stft" "frsst"
             type_layer, # "attn" "conv" "atten+conv"
             device,
     ):
@@ -67,6 +67,7 @@ class FADTI(nn.Module):
             num_layers=num_layers,
             num_steps=num_steps,
             method=method,
+            type_layer=type_layer,
         )
 
         # Noise Paremeters for diffusion model

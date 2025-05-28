@@ -82,7 +82,7 @@ def get_dataloader(
 
     # data normalization
     observed_values = np.nan_to_num(observed_values)
-    # observed_values = data_normalize(observed_values, observed_masks, 7)
+    observed_values = data_normalize(observed_values, observed_masks, 7)
     # devide into three dataloader and return 
     dataset = ETT_Dataset(
         observed_masks=observed_masks, 
@@ -187,8 +187,9 @@ def get_dataset(
     )
 
     # data normalization
-    # observed_values = np.nan_to_num(observed_values)
-    # observed_values = data_normalize(observed_values, observed_masks, 7)
+    observed_values = np.nan_to_num(observed_values)
+    observed_values = data_normalize(observed_values, observed_masks, 7)
+    observed_values[observed_masks == 0] = np.nan
     # devide into three dataloader and return 
     dataset = ETT_Dataset(
         observed_masks=observed_masks, 

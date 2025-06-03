@@ -30,7 +30,7 @@ model:
   MIT: True
 
 train:
-  epochs: 500
+  epochs: 200
   lr: 0.001
   itr_per_epoch: 1.0e+8
   save_strategy: "best"

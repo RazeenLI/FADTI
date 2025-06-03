@@ -4,5 +4,5 @@ data:
   seed: 1
   num_steps: 144
   num_features: 21
-  batch_size: 16 
+  batch_size: 8
   missing_pattern: 'point'

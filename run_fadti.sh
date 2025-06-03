@@ -9,7 +9,8 @@ mkdir -p logs
 ffttypes=("dft" "stft" "frsst")
 timetypes=("attn" "conv")
 # timetypes=("attn")
-datas=("ett")
+datas=("ett" "weather")
+# ett weather
 nfolds=(0 1 2 3 4)
 missrates=(0.1 0.5)
 misspatterns=("point" "time")
@@ -18,9 +19,9 @@ nsample=100
 device="cuda:6"
 
 # 外层循环遍历所有参数组合
-for ffttype in "${ffttypes[@]}"; do
-  for timetype in "${timetypes[@]}"; do
-    for data in "${datas[@]}"; do
+for data in "${datas[@]}"; do
+  for ffttype in "${ffttypes[@]}"; do
+    for timetype in "${timetypes[@]}"; do
       for nfold in "${nfolds[@]}"; do
         for missrate in "${missrates[@]}"; do
           for misspattern in "${misspatterns[@]}"; do

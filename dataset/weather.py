@@ -63,18 +63,12 @@ def get_dataloader(
     # add random mask
     rng = np.random.default_rng(seed)
 
-    if missing_pattern == 'block':
-        gt_masks = sample_mask(
-            observed_masks=observed_masks,
-            missing_ratio=missing_ratio, 
-            rng=rng
-        )
-    elif missing_pattern == 'point':
-        gt_masks = sample_mask(
-            observed_masks=observed_masks,
-            missing_ratio=missing_ratio, 
-            rng=rng
-        )
+    gt_masks = sample_mask(
+        observed_masks=observed_masks,
+        missing_ratio=missing_ratio, 
+        rng=rng,
+        missing_pattern=missing_pattern
+    )
     # gt_masks = (1 - (gt_masks | (1 - observed_masks))).astype('uint8')
 
     print(
@@ -87,7 +81,7 @@ def get_dataloader(
 
     # data normalization
     observed_values = np.nan_to_num(observed_values)
-    # observed_values = data_normalize(observed_values, observed_masks, 7)
+    observed_values = data_normalize(observed_values, observed_masks, 21)
     # devide into three dataloader and return 
     dataset = Weather_Dataset(
         observed_masks=observed_masks, 

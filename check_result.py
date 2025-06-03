@@ -33,6 +33,7 @@ for folder in os.listdir(root_dir):
                 'mae': data[1],
                 'mape': data[2],
                 'crps': data[3],
+                'time': data[4],
             })
 
 
@@ -51,7 +52,7 @@ count_df = df.groupby(group_cols).size().reset_index(name='count')
 mean_df = mean_df.merge(count_df, on=group_cols)
 
 # 需要保留三位小数的列
-cols_to_round = ['rmse', 'mae', 'mape', 'crps']
+cols_to_round = ['mae', 'rmse', 'mape', 'crps', 'time']
 # 保留三位小数
 mean_df[cols_to_round] = mean_df[cols_to_round].round(3)
 

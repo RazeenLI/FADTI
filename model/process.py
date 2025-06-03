@@ -5,6 +5,7 @@ from torch.optim import AdamW, SGD, Adam
 from tqdm import tqdm
 from typing import Union, Optional
 import pickle
+import time
 # from nn.looksam import LookSAM
 # from nn.sam import SAM
 
@@ -186,6 +187,8 @@ class Process(object):
             all_evalpoint = []
             all_generated_samples = []
             with tqdm(test_loader, mininterval=5.0, maxinterval=50.0, disable=self.disable_tqdm) as it:
+                start_time = time.time()
+
                 for batch_index, batch_data in enumerate(it, start=1):
                     output = self.model.evaluate(batch_data, nsample)
 
@@ -247,6 +250,9 @@ class Process(object):
                         f,
                     )
 
+                end_time = time.time()
+                elapsed_time = end_time - start_time
+
                 rmse = np.sqrt(mse_total / evalpoints_total).item()
                 mae = mae_total / evalpoints_total
                 mape = mape_total / evalpoints_total
@@ -263,6 +269,7 @@ class Process(object):
                             mae,
                             mape,
                             crps,
+                            elapsed_time,
                         ],
                         f,
                     )
@@ -270,6 +277,7 @@ class Process(object):
                     print("MAE:", mae)
                     print("MAPE:", mape)
                     print("CRPS:", crps)
+                    print("Elapsed Time (s):", elapsed_time)
 
                 self.info["test"].append({
                     "RMSE": rmse,

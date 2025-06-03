@@ -1,4 +1,4 @@
-# python run.py --model "ftcsdi" --data "ett" --nsample 100 --nfold 0 --missrate 0.1 --misspattern "point" --device "cuda:6" --modelfolder "ftcsdi_ett_point_0.1_20250404_085422"
+# python run_old.py --model "ftcsdi" --data "ett" --nsample 100 --nfold 0 --missrate 0.1 --misspattern "point" --device "cuda:6" --modelfolder "ftcsdi_ett_point_0.1_20250404_085422"
 # python run.py --model "saits" --data "ett" --nsample 100 --nfold 0 --missrate 0.1 --misspattern "point" --device "cuda:6" --modelfolder "saits_ett_time_0.5_20250410_103809"
 # python run.py --model "csdi" --data "ett" --nsample 100 --nfold 0 --device "cuda:5"
 # python run.py --model "csdi_ori" --data "ett" --nsample 100 --nfold 0 --device "cuda:4" 
@@ -120,94 +120,29 @@ elif args.model == "csdi_ori":
             target_strategy=config["model"]["target_strategy"],
             device=args.device,
         )
-elif args.model == "ftcsdi":
-    from model.fourier_t_csdi.model import FTCSDI
-    config_diff = config["diffusion"]
-    model = FTCSDI(
-            data_name=args.data,
-            num_features=config["data"]["num_features"],
-            num_steps=config["data"]["num_steps"],
-            num_layers=config_diff["layers"],
-            num_heads=config_diff["nheads"],
-            num_channels=config_diff["channels"],
-            num_diffusion_steps=config_diff["num_steps"],
-            dim_time_embedding=config["model"]["timeemb"],
-            dim_feature_embedding=config["model"]["featureemb"],
-            dim_diffusion_embedding=config_diff["diffusion_embedding_dim"],
-            is_unconditional=config["model"]["is_unconditional"],
-            schedule=config_diff["schedule"],
-            beta_start=config_diff["beta_start"],
-            beta_end=config_diff["beta_end"],
-            target_strategy=config["model"]["target_strategy"],
-            method="fbm",
-            device=args.device,
-        )
 elif args.model == "fadti":
     from model.fadti.model import FADTI
     config_diff = config["diffusion"]
     model = FADTI(
-            data_name=args.data,
-            num_features=config["data"]["num_features"],
-            num_steps=config["data"]["num_steps"],
-            num_layers=config_diff["layers"],
-            num_heads=config_diff["nheads"],
-            num_channels=config_diff["channels"],
-            num_diffusion_steps=config_diff["num_steps"],
-            dim_time_embedding=config["model"]["timeemb"],
-            dim_feature_embedding=config["model"]["featureemb"],
-            dim_diffusion_embedding=config_diff["diffusion_embedding_dim"],
-            is_unconditional=config["model"]["is_unconditional"],
-            schedule=config_diff["schedule"],
-            beta_start=config_diff["beta_start"],
-            beta_end=config_diff["beta_end"],
-            target_strategy=config["model"]["target_strategy"],
-            method="fbm",
-            device=args.device,
-        )
-elif args.model == "ftcsdi_fsst":
-    from model.fourier_t_csdi.model import FTCSDI
-    config_diff = config["diffusion"]
-    model = FTCSDI(
-            data_name=args.data,
-            num_features=config["data"]["num_features"],
-            num_steps=config["data"]["num_steps"],
-            num_layers=config_diff["layers"],
-            num_heads=config_diff["nheads"],
-            num_channels=config_diff["channels"],
-            num_diffusion_steps=config_diff["num_steps"],
-            dim_time_embedding=config["model"]["timeemb"],
-            dim_feature_embedding=config["model"]["featureemb"],
-            dim_diffusion_embedding=config_diff["diffusion_embedding_dim"],
-            is_unconditional=config["model"]["is_unconditional"],
-            schedule=config_diff["schedule"],
-            beta_start=config_diff["beta_start"],
-            beta_end=config_diff["beta_end"],
-            target_strategy=config["model"]["target_strategy"],
-            method="fsst",
-            device=args.device,
-        )
-elif args.model == "ftcsdi_frsst":
-    from model.fourier_t_csdi.model import FTCSDI
-    config_diff = config["diffusion"]
-    model = FTCSDI(
-            data_name=args.data,
-            num_features=config["data"]["num_features"],
-            num_steps=config["data"]["num_steps"],
-            num_layers=config_diff["layers"],
-            num_heads=config_diff["nheads"],
-            num_channels=config_diff["channels"],
-            num_diffusion_steps=config_diff["num_steps"],
-            dim_time_embedding=config["model"]["timeemb"],
-            dim_feature_embedding=config["model"]["featureemb"],
-            dim_diffusion_embedding=config_diff["diffusion_embedding_dim"],
-            is_unconditional=config["model"]["is_unconditional"],
-            schedule=config_diff["schedule"],
-            beta_start=config_diff["beta_start"],
-            beta_end=config_diff["beta_end"],
-            target_strategy=config["model"]["target_strategy"],
-            method="frsst",
-            device=args.device,
-        )
+        data_name=args.data,
+        num_features=config["data"]["num_features"],
+        num_steps=config["data"]["num_steps"],
+        num_layers=config_diff["layers"],
+        num_heads=config_diff["nheads"],
+        num_channels=config_diff["channels"],
+        num_diffusion_steps=config_diff["num_steps"],
+        dim_time_embedding=config["model"]["timeemb"],
+        dim_feature_embedding=config["model"]["featureemb"],
+        dim_diffusion_embedding=config_diff["diffusion_embedding_dim"],
+        is_unconditional=config["model"]["is_unconditional"],
+        schedule=config_diff["schedule"],
+        beta_start=config_diff["beta_start"],
+        beta_end=config_diff["beta_end"],
+        target_strategy=config["model"]["target_strategy"],
+        method="dft", # "fbm", "frsst"
+        type_layer="attn", # "attn" "conv" "atten+conv"
+        device=args.device,
+    )
 elif args.model == "saits":
     from model.saits.model import SAITS
     config_diff = config["diffusion"]

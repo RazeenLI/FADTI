@@ -3,10 +3,10 @@
 # nohup ./run.sh > run.log 2>&1 & 
 mkdir -p logs
 # 示例参数数组，可根据需要修改
-models=("fadti")
+models=("csdi_ori" "csdi" "fadti")
 # ("csdi_ori" "csdi" "ftcsdi" "saits")
-datas=("ett")
-nfolds=(3 4)
+datas=("ett" "weather")
+nfolds=(0 1 2 3 4)
 missrates=(0.1 0.5)
 misspatterns=("point" "time")
 # nsample 和 device 可以直接定义
@@ -21,8 +21,8 @@ for model in "${models[@]}"; do
                 for misspattern in "${misspatterns[@]}"; do
                     # 构造输出文件名，可以根据需求修改命名规则
                     output_file="logs/${model}_${data}_${nfold}.out"
-                    echo "Running: python run.py --model \"$model\" --data \"$data\" --nsample $nsample --device \"$device\" --nfold $nfold --misspattern \"$misspattern\" --missrate $missrate > $output_file"
-                    python run.py --model "$model" --data "$data" --nsample $nsample --device "$device" --nfold $nfold --misspattern "$misspattern" --missrate $missrate > "$output_file"
+                    echo "Running: python run_old.py --model \"$model\" --data \"$data\" --nsample $nsample --device \"$device\" --nfold $nfold --misspattern \"$misspattern\" --missrate $missrate > $output_file"
+                    python run_old.py --model "$model" --data "$data" --nsample $nsample --device "$device" --nfold $nfold --misspattern "$misspattern" --missrate $missrate > "$output_file"
                 done
             done
          done

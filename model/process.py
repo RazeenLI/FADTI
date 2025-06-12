@@ -13,13 +13,13 @@ class Process(object):
     def __init__(
             self,
             model,
-            learning_rate,
+            scaler,
             device: Optional[Union[str, torch.device, list]] = None,
             epochs: int = 100,
             batch_size: int = 32,
             patience: Optional[int] = None,
             save_strategy="new", # "new", "best", "none", "all"
-            optimizer_type="adamw"
+            optimizer= None
         ):
         super().__init__()
         self.device = device
@@ -34,10 +34,11 @@ class Process(object):
         self.model = model.to(self.device)
         
         # set up optimizer
-        if optimizer_type == "adamw":
-            self.optimizer = AdamW(self.model.parameters(), lr=learning_rate, weight_decay=1e-6)
-        elif optimizer_type == "adam":
-            self.optimizer = Adam(self.model.parameters(), lr=learning_rate, weight_decay=1e-6)
+        self.optimizer = optimizer
+        # if optimizer_type == "adamw":
+        #     self.optimizer = AdamW(self.model.parameters(), lr=learning_rate, weight_decay=1e-6)
+        # elif optimizer_type == "adam":
+        #     self.optimizer = Adam(self.model.parameters(), lr=learning_rate, weight_decay=1e-6)
         # self.optimizer = SGD(self.model.parameters(), momentum=0.9, lr=learning_rate, weight_decay=1e-6)
         # base_optimizer = AdamW
         # self.optimizer = SAM(self.model.parameters(), base_optimizer, lr=learning_rate, weight_decay=1e-6)
@@ -45,8 +46,12 @@ class Process(object):
         # p1 = int(0.75 * epochs)
         # p2 = int(0.9 * epochs)
         # self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[p1, p2], gamma=0.1)
-        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=epochs)
+        if self.optimizer is not None:
+            self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=epochs)
+        else:
+            self.scheduler = None
 
+        self.scaler = scaler
 
         self.info = {
             "train": [],
@@ -187,10 +192,13 @@ class Process(object):
             all_evalpoint = []
             all_generated_samples = []
             with tqdm(test_loader, mininterval=5.0, maxinterval=50.0, disable=self.disable_tqdm) as it:
-                start_time = time.time()
+                elapsed_time = 0
 
                 for batch_index, batch_data in enumerate(it, start=1):
+                    start_time = time.time()
                     output = self.model.evaluate(batch_data, nsample)
+                    end_time = time.time()
+                    elapsed_time += (end_time - start_time)
 
                     samples, c_target, eval_points, observed_points, observed_time = output # samples, observed_data, target_mask, observed_mask, observed_tp
                     
@@ -200,14 +208,19 @@ class Process(object):
                     observed_points = observed_points.permute(0, 2, 1)
 
                     samples_median = samples.median(dim=1)
+                    
                     all_target.append(c_target)
                     all_evalpoint.append(eval_points)
                     all_observed_point.append(observed_points)
                     all_observed_time.append(observed_time)
                     all_generated_samples.append(samples)
 
-                    error = (samples_median.values - c_target) * eval_points
+                    samples_orig = self.scaler.inverse_transform(samples_median.values, eval_points)  # (B, C, T)
+                    target_orig = self.scaler.inverse_transform(c_target, eval_points) # self.device)
+                    error = (samples_orig - target_orig) * eval_points
+                    # error = (samples_median.values - c_target) * eval_points
                     error_scaled = error * scaler
+                    # print(samples_median.values.shape, c_target.shape, error.sum())
 
                     mse_current = (error_scaled ** 2)
                     mae_current = torch.abs(error_scaled)
@@ -249,9 +262,6 @@ class Process(object):
                         ],
                         f,
                     )
-
-                end_time = time.time()
-                elapsed_time = end_time - start_time
 
                 rmse = np.sqrt(mse_total / evalpoints_total).item()
                 mae = mae_total / evalpoints_total

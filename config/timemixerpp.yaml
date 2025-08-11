@@ -1,0 +1,24 @@
+
+#type: args
+
+model:
+  dropout: 0.5
+  top_k: 5
+  dim_model: 16
+  dim_ffn: 32
+  down_sampling_layers: 3
+  down_sampling_window: 2
+  layers: 3
+  channel_independence: 1
+  decomp_method: "moving_avg"
+  moving_avg: 25
+  task_name: "imputation"
+  n_heads: 8
+  n_kernels: 6
+  channel_mixing: True
+
+train:
+  epochs: 200
+  lr: 0.01
+  itr_per_epoch: 1.0e+8
+  save_strategy: "best"

@@ -1,0 +1,16 @@
+
+#type: args
+
+model:
+  dropout: 0.5
+  top_k: 5
+  dim_model: 16
+  dim_ffn: 32
+  num_kernels: 6
+  layers: 2
+
+train:
+  epochs: 200
+  lr: 1.0e-3
+  itr_per_epoch: 1.0e+8
+  save_strategy: "best"

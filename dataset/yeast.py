@@ -6,36 +6,65 @@ import numpy as np
 import pandas as pd
 from torch.utils.data import DataLoader, Dataset
 from utils.utils import sample_mask, data_normalize, StandardScaler, MaskedStandardScaler
+import pickle
 # from sklearn.preprocessing import StandardScaler
 
 def create_data():
-    df = pd.read_csv('./data/ETTm1.csv')
+    # 1. 指定用于插补的字段
+    imputation_features = [
+        "length", "width", "area", "perimeter",
+        "fluo1", "sharpness", "cell_count"
+    ]
 
-    df['date'] = pd.to_datetime(df['date'], format='%Y-%m-%d %H:%M:%S', errors='coerce')
-    df['day'] = df['date'].dt.date
-    df = df.sort_values('date')
-    feature_cols = df.columns.drop(['date', 'day'])
+    # 2. 读取 .pkl 文件
+    file_path = './data/YeastSet2.pkl'
+    with open(file_path, 'rb') as f:
+        data = pickle.load(f)
+    
+    # 3. 提取 raw_dataset 并拼接指定字段
+    raw_dataset = data['raw_dataset']
+    observed_values = np.concatenate(
+        [np.array(raw_dataset[feat]) for feat in imputation_features],
+        axis=-1  # [N, T, 1] → [N, T, F]
+    )
 
-    grouped = df.groupby('day')
-    observed_values = []
-    for day, group in grouped:
-        group = group.sort_values('date')
-        arr = group[feature_cols].to_numpy()
-        observed_values.append(arr)
-    observed_values
-
-    # 6. 以第一天的时间步数作为标准，筛选出符合要求的天的数据
+    # 4. 统一时间步数（只保留完整样本）
     expected_time_steps = observed_values[0].shape[0]
-    observed_values = [arr for arr in observed_values if arr.shape[0] == expected_time_steps]
+    observed_values = [
+        sample for sample in observed_values if sample.shape[0] == expected_time_steps
+    ]
 
+    # 5. 转为 numpy 数组 [N, T, F]
     observed_values = np.stack(observed_values, axis=0)
+
+
+    # df = pd.read_csv('./data/ETTm1.csv')
+
+    # df['date'] = pd.to_datetime(df['date'], format='%Y-%m-%d %H:%M:%S', errors='coerce')
+    # df['day'] = df['date'].dt.date
+    # df = df.sort_values('date')
+    # feature_cols = df.columns.drop(['date', 'day'])
+
+    # grouped = df.groupby('day')
+    # observed_values = []
+    # for day, group in grouped:
+    #     group = group.sort_values('date')
+    #     arr = group[feature_cols].to_numpy()
+    #     observed_values.append(arr)
+    # observed_values
+
+    # # 6. 以第一天的时间步数作为标准，筛选出符合要求的天的数据
+    # expected_time_steps = observed_values[0].shape[0]
+    # observed_values = [arr for arr in observed_values if arr.shape[0] == expected_time_steps]
+
+    # observed_values = np.stack(observed_values, axis=0)
 
     return observed_values 
 
 def get_data():
     # get total dataset, if not exit, create new dataset
     # 1. load data
-    path = ("./data/ettm1.pk")
+    path = ("./data/yeast.pk")
 
     if os.path.isfile(path):  
         # load data file
@@ -82,16 +111,6 @@ def get_dataloader(
     )
 
     # data normalization
-    # observed_values = np.nan_to_num(observed_values)
-    # observed_values = data_normalize(observed_values, observed_masks, 7)
-    # devide into three dataloader and return 
-    # dataset = ETT_Dataset(
-    #     observed_masks=observed_masks, 
-    #     observed_values=observed_values, 
-    #     gt_masks=gt_masks,
-    #     eval_length=num_steps
-    # )
-    # indlist = np.arange(len(dataset))
     indlist = np.arange(len(observed_values))
 
     # 5-fold test
@@ -113,7 +132,7 @@ def get_dataloader(
     observed_values = scaler.transform(observed_values, observed_masks)
     observed_values = np.nan_to_num(observed_values)
 
-    train_dataset = ETT_Dataset(
+    train_dataset = Yeast_Dataset(
         use_index_list=train_index,
         observed_masks=observed_masks, 
         observed_values=observed_values, 
@@ -122,7 +141,7 @@ def get_dataloader(
     )
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=1)
 
-    valid_dataset = ETT_Dataset(
+    valid_dataset = Yeast_Dataset(
         use_index_list=valid_index, 
         observed_masks=observed_masks, 
         observed_values=observed_values, 
@@ -131,7 +150,7 @@ def get_dataloader(
     )
     valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=0)
 
-    test_dataset = ETT_Dataset(
+    test_dataset = Yeast_Dataset(
         use_index_list=test_index, 
         observed_masks=observed_masks, 
         observed_values=observed_values, 
@@ -142,7 +161,7 @@ def get_dataloader(
 
     return train_loader, valid_loader, test_loader, scaler
 
-class ETT_Dataset(Dataset):
+class Yeast_Dataset(Dataset):
     def __init__(self, observed_values, observed_masks, gt_masks, eval_length, use_index_list=None):
         self.eval_length = eval_length
         self.observed_values = observed_values
@@ -159,10 +178,6 @@ class ETT_Dataset(Dataset):
             "timepoints": np.arange(self.eval_length),
             "next_data": self.observed_values[index + 1] if (index + 1 in self.use_index_list) else np.zeros_like(self.observed_values[index])  # 占位张量
         }
-        # if (index + 1 in self.use_index_list): #  and ((index + 1) < len(self.observed_values)):
-        #     s["next_data"] = self.observed_values[index + 1]
-        # else:
-        #     s["next_data"] = None
         return s
 
     def __len__(self):
@@ -251,92 +266,3 @@ def get_dataset(
     }
 
     return train_set, valid_set, test_set, scaler
-
-# def get_dataset(
-#         nfold=None,
-#         seed=1,
-#         missing_pattern='block',
-#         missing_ratio=0.0,
-#         batch_size=16,
-#         num_steps=96
-# ):
-#     # get total dataset, if not exit, create new dataset
-#     observed_values = get_data()
-#     observed_masks = (~np.isnan(observed_values)).astype("uint8") # float32
-
-#     # add random mask
-#     rng = np.random.default_rng(seed)
-
-#     gt_masks = sample_mask(
-#         observed_masks=observed_masks,
-#         missing_ratio=missing_ratio, 
-#         rng=rng,
-#         missing_pattern=missing_pattern
-#     )
-#     # gt_masks = (1 - (gt_masks | (1 - observed_masks))).astype('uint8')
-
-#     print(
-#         "Original missing ratio = {:.4f}\nArtificial missing pattern: {}\nOverall missing ratio = {:.4f}".format(
-#             1 - np.sum(observed_masks) / observed_masks.size,
-#             missing_pattern,
-#             1 - np.sum(gt_masks) / gt_masks.size,
-#         )
-#     )
-
-#     # data normalization
-#     observed_values = np.nan_to_num(observed_values)
-#     observed_values = data_normalize(observed_values, observed_masks, 7)
-#     observed_values[observed_masks == 0] = np.nan
-#     # devide into three dataloader and return 
-#     dataset = ETT_Dataset(
-#         observed_masks=observed_masks, 
-#         observed_values=observed_values, 
-#         gt_masks=gt_masks,
-#         eval_length=num_steps
-#     )
-#     indlist = np.arange(len(dataset))
-
-#     # 5-fold test
-#     start = (int)(nfold * 0.2 * len(dataset))
-#     end = (int)((nfold + 1) * 0.2 * len(dataset))
-#     test_index = indlist[start:end]
-#     remain_index = np.delete(indlist, np.arange(start, end))
-#     # test_index = indlist[:2]
-#     # remain_index = indlist[2:]
-
-#     num_train = (int)(len(dataset) * 0.7)
-#     train_index = remain_index[:num_train]
-#     valid_index = remain_index[num_train:]
-
-
-#     X_ori = observed_values[train_index]
-#     gt_mask = gt_masks[train_index]
-#     X = X_ori.copy()
-#     X[gt_mask == 1] = np.nan
-#     train_set = {
-#         'X': X, 
-#         'X_ori': X_ori,
-#         'mask_X_gt': gt_mask
-#     }
-
-#     X_ori = observed_values[valid_index]
-#     gt_mask = gt_masks[valid_index]
-#     X = X_ori.copy()
-#     X[gt_mask == 1] = np.nan
-#     valid_set = {
-#         'X': X,
-#         'X_ori': X_ori, 
-#         'mask_X_gt': gt_mask
-#     }
-
-#     X_ori = observed_values[test_index]
-#     gt_mask = gt_masks[test_index]
-#     X = X_ori.copy()
-#     X[gt_mask == 1] = np.nan
-#     test_set = {
-#         'X': X,
-#         'X_ori': X_ori,
-#         'mask_X_gt': gt_mask
-#     }
-
-#     return train_set, valid_set, test_set

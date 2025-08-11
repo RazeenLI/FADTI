@@ -201,6 +201,7 @@ class Process(object):
                     elapsed_time += (end_time - start_time)
 
                     samples, c_target, eval_points, observed_points, observed_time = output # samples, observed_data, target_mask, observed_mask, observed_tp
+                    # print("samples, c_target, eval_points", samples.shape, c_target.shape, eval_points.shape)
                     
                     samples = samples.permute(0, 1, 3, 2)  # (B,nsample,L,K)
                     c_target = c_target.permute(0, 2, 1)  # (B,L,K)
@@ -208,6 +209,7 @@ class Process(object):
                     observed_points = observed_points.permute(0, 2, 1)
 
                     samples_median = samples.median(dim=1)
+                    # print("samples shape", samples.shape, "eval_points shape", eval_points.shape)
                     
                     all_target.append(c_target)
                     all_evalpoint.append(eval_points)

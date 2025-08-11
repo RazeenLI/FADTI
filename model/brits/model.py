@@ -141,7 +141,7 @@ class BRITS(nn.Module):
         forward_delta = self.compute_deltas(conditional_mask, False)
 
         back_observed_data = observed_data.flip(dims=[2])
-        back_conditional_mask = observed_mask.flip(dims=[2])
+        back_conditional_mask = conditional_mask.flip(dims=[2])
         backward_deltas = forward_delta.flip(dims=[2])
 
         observed_data = observed_data.permute(0, 2, 1) 
@@ -211,7 +211,8 @@ class BRITS(nn.Module):
                 # res["for_pattern_mask"],
             )
 
-            conditional_mask = self.get_randmask(observed_mask)
+            # conditional_mask = self.get_randmask(observed_mask)
+            conditional_mask = gt_mask
             # side_info = self.get_side_info(observed_tp, conditional_mask)
 
             # training loss

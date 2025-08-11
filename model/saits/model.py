@@ -31,26 +31,28 @@ import numpy as np
 
 # from modeling.layers import *
 # from modeling.utils import masked_mae_cal
-from .layers import EncoderLayer, PositionalEncoding
+# from .layers import EncoderLayer, PositionalEncoding
 from nn.process_data import get_process_data
+from .layers import BackboneSAITS
+from ..timesnet.model import masked_mae_cal, masked_mse_cal
 
 
 class SAITS(nn.Module):
     def __init__(
         self,
         data_name,
-        n_groups,
+        n_groups, # num_layers
         n_group_inner_layers,
         dim_time,
         dim_feature,
         dim_model,
-        dim_hidden,
+        dim_hidden, # d_ffn
         num_heads, # num_heads
         dim_k,
         dim_v,
         dropout,
-        reconstruction_loss_weight,
-        imputation_loss_weight,
+        reconstruction_loss_weight, # ORT_weight
+        imputation_loss_weight, # MIT_weight
         diagonal_attention_mask,
         device,
         param_sharing_strategy,
@@ -58,123 +60,117 @@ class SAITS(nn.Module):
         MIT,
         **kwargs
     ):
+        
         super().__init__()
         self.process_data = get_process_data(data_name)
-        self.n_groups = n_groups
-        self.n_group_inner_layers = n_group_inner_layers
-        self.input_with_mask = input_with_mask # kwargs["input_with_mask"]
-        actual_d_feature = dim_feature * 2 if self.input_with_mask else dim_feature
-        self.param_sharing_strategy = param_sharing_strategy # kwargs["param_sharing_strategy"]
-        self.MIT = MIT # kwargs["MIT"]
+
+        self.n_layers = n_groups
+        self.n_steps = dim_time
+        self.diagonal_attention_mask = diagonal_attention_mask
+        self.ORT_weight = reconstruction_loss_weight
+        self.MIT_weight = imputation_loss_weight
+        self.MIT = MIT
+        # self.training_loss = training_loss
+
+        self.encoder = BackboneSAITS(
+            n_steps=dim_time,
+            n_features=dim_feature,
+            n_layers=n_groups,
+            d_model=dim_model,
+            n_heads=num_heads,
+            d_k=dim_k,
+            d_v=dim_v,
+            d_ffn=dim_hidden,
+            dropout=dropout,
+            attn_dropout=0,
+        )
         self.device = device # kwargs["device"]
-        self.reconstruction_loss_weight = reconstruction_loss_weight
-        self.imputation_loss_weight = imputation_loss_weight
 
-        num_layers = n_group_inner_layers if self.param_sharing_strategy == "between_group" else n_groups
+    def impute(
+            self,
+            observed_data,
+            conditional_mask,
+    ):
+        observed_data = observed_data.permute(0, 2, 1) 
+        conditional_mask = conditional_mask.permute(0, 2, 1)
+        # observed_mask = observed_mask.permute(0, 2, 1)
 
-        self.layer_stack_for_first_block = nn.ModuleList(
-            [
-                EncoderLayer(
-                    dim_time=dim_time, # d_time,
-                    dim_feature=actual_d_feature, # actual_d_feature,
-                    dim_model=dim_model, # d_model,
-                    dim_hidden=dim_hidden, # d_inner,
-                    num_heads=num_heads, # n_head,
-                    dim_k=dim_k, # d_k,
-                    dim_v=dim_v, # d_v,
-                    dropout=dropout, # dropout,
-                    attn_dropout=0,# 0,
-                    diagonal_attention_mask=diagonal_attention_mask,
-                    device=device
-                ) for _ in range(num_layers)
-            ]
-        )
-        self.layer_stack_for_second_block = nn.ModuleList(
-            [
-                EncoderLayer(
-                    dim_time=dim_time, # d_time,
-                    dim_feature=actual_d_feature, # actual_d_feature,
-                    dim_model=dim_model, # d_model,
-                    dim_hidden=dim_hidden, # d_inner,
-                    num_heads=num_heads, # n_head,
-                    dim_k=dim_k, # d_k,
-                    dim_v=dim_v, # d_v,
-                    dropout=dropout, # dropout,
-                    attn_dropout=0,# 0,
-                    diagonal_attention_mask=diagonal_attention_mask,
-                    device=device
-                ) for _ in range(num_layers)
-            ]
-        )
-
-        self.dropout = nn.Dropout(p=dropout)
-        self.position_enc = PositionalEncoding(dim_model, n_position=dim_time)
-        # for the 1st block
-        self.embedding_1 = nn.Linear(actual_d_feature, dim_model)
-        self.reduce_dim_z = nn.Linear(dim_model, dim_feature)
-        # for the 2nd block
-        self.embedding_2 = nn.Linear(actual_d_feature, dim_model)
-        self.reduce_dim_beta = nn.Linear(dim_model, dim_feature)
-        self.reduce_dim_gamma = nn.Linear(dim_feature, dim_feature)
-        # for the 3rd block
-        self.weight_combine = nn.Linear(dim_feature + dim_time, dim_feature)
-
-    def impute(self, X, masks):
-        # X, masks = inputs["X"], inputs["missing_mask"]
-        # the first DMSA block
-        input_X_for_first = torch.cat([X, masks], dim=2) if self.input_with_mask else X
-        # print(f"\n\n\n{input_X_for_first.shape}\n{masks.shape}\n\n\n")
-        input_X_for_first = self.embedding_1(input_X_for_first)
-        enc_output = self.dropout(
-            self.position_enc(input_X_for_first)
-        )  # namely term e in math algo
-        if self.param_sharing_strategy == "between_group":
-            for _ in range(self.n_groups):
-                for encoder_layer in self.layer_stack_for_first_block:
-                    enc_output, _ = encoder_layer(enc_output)
+        if self.diagonal_attention_mask:
+            mask_time = (1 - torch.eye(self.n_steps)).to(self.device).unsqueeze(0)
         else:
-            for encoder_layer in self.layer_stack_for_first_block:
-                for _ in range(self.n_group_inner_layers):
-                    enc_output, _ = encoder_layer(enc_output)
+            mask_time = None
 
-        X_tilde_1 = self.reduce_dim_z(enc_output)
-        X_prime = masks * X + (1 - masks) * X_tilde_1
+        (
+            X_tilde_1,
+            X_tilde_2,
+            X_tilde_3,
+            first_DMSA_attn_weights,
+            second_DMSA_attn_weights,
+            combining_weights,
+        ) = self.encoder(observed_data, conditional_mask, mask_time)
 
-        # the second DMSA block
-        input_X_for_second = (
-            torch.cat([X_prime, masks], dim=2) if self.input_with_mask else X_prime
-        )
-        input_X_for_second = self.embedding_2(input_X_for_second)
-        enc_output = self.position_enc(
-            input_X_for_second
-        )  # namely term alpha in math algo
-        if self.param_sharing_strategy == "between_group":
-            for _ in range(self.n_groups):
-                for encoder_layer in self.layer_stack_for_second_block:
-                    enc_output, attn_weights = encoder_layer(enc_output)
+        # replace the observed part with values from X
+        imputed_data = conditional_mask * observed_data + (1 - conditional_mask) * X_tilde_3
+
+        imputed_data = imputed_data.permute(0, 2, 1)
+        return imputed_data
+
+    def calc_loss(
+            self, 
+            observed_data, 
+            conditional_mask, 
+            observed_mask,
+    ):
+        observed_data = observed_data.permute(0, 2, 1) 
+        conditional_mask = conditional_mask.permute(0, 2, 1)
+        observed_mask = observed_mask.permute(0, 2, 1)
+
+        # if (self.training and self.diagonal_attention_mask) or ((not self.training) and diagonal_attention_mask):
+        #     diagonal_attention_mask = (1 - torch.eye(self.n_steps)).to(self.device)
+        #     # then broadcast on the batch axis
+        #     diagonal_attention_mask = diagonal_attention_mask.unsqueeze(0)
+        # else:
+        #     diagonal_attention_mask = None
+        if self.diagonal_attention_mask:
+            mask_time = (1 - torch.eye(self.n_steps)).to(self.device).unsqueeze(0)
         else:
-            for encoder_layer in self.layer_stack_for_second_block:
-                for _ in range(self.n_group_inner_layers):
-                    enc_output, attn_weights = encoder_layer(enc_output)
+            mask_time = None
+        
+        # print("mask_time.shape", mask_time.shape)
+        input_data = observed_data * conditional_mask
 
-        X_tilde_2 = self.reduce_dim_gamma(F.relu(self.reduce_dim_beta(enc_output)))
+        (
+            X_tilde_1,
+            X_tilde_2,
+            X_tilde_3,
+            first_DMSA_attn_weights,
+            second_DMSA_attn_weights,
+            combining_weights,
+        ) = self.encoder(input_data, conditional_mask, mask_time)
 
-        # the attention-weighted combination block
-        attn_weights = attn_weights.squeeze(dim=1)  # namely term A_hat in math algo
-        if len(attn_weights.shape) == 4:
-            # if having more than 1 head, then average attention weights from all heads
-            attn_weights = torch.transpose(attn_weights, 1, 3)
-            attn_weights = attn_weights.mean(dim=3)
-            attn_weights = torch.transpose(attn_weights, 1, 2)
+        # replace the observed part with values from X
+        # imputed_data = conditional_mask * observed_data + (1 - conditional_mask) * X_tilde_3
 
-        combining_weights = F.sigmoid(
-            self.weight_combine(torch.cat([masks, attn_weights], dim=2))
-        )  # namely term eta
-        # combine X_tilde_1 and X_tilde_2
-        X_tilde_3 = (1 - combining_weights) * X_tilde_2 + combining_weights * X_tilde_1
-        # replace non-missing part with original data
-        X_c = masks * X + (1 - masks) * X_tilde_3
-        return X_c, [X_tilde_1, X_tilde_2, X_tilde_3]
+        reconstruction_loss = 0
+
+        reconstruction_loss += masked_mae_cal(X_tilde_1, input_data, conditional_mask)
+        reconstruction_loss += masked_mae_cal(X_tilde_2, input_data, conditional_mask)
+        reconstruction_loss += masked_mae_cal(X_tilde_3, input_data, conditional_mask)
+        # reconstruction_loss += final_reconstruction_MAE
+        reconstruction_loss /= 3
+
+        if not self.training:
+            # have to cal imputation loss in the val stage
+            target_mask = observed_mask - conditional_mask
+
+            imputation_MAE = masked_mae_cal(X_tilde_3, observed_data, target_mask)
+        else:
+            imputation_MAE = torch.tensor(0.0)
+
+        loss = self.ORT_weight * reconstruction_loss + self.MIT_weight * imputation_MAE
+        return loss
+
+
 
     def forward(
             self, 
@@ -198,40 +194,31 @@ class SAITS(nn.Module):
             res["gt_mask"],
             # res["for_pattern_mask"],
         )
-        observed_data = observed_data.permute(0, 2, 1)
-        observed_mask = observed_mask.permute(0, 2, 1)
-        gt_mask = gt_mask.permute(0, 2, 1)
-        # X, masks = inputs["X"], inputs["missing_mask"]
-        reconstruction_loss = 0
-        total_input = observed_data * gt_mask
-        _, [X_tilde_1, X_tilde_2, X_tilde_3] = self.impute(X=total_input, masks=observed_mask)
 
-        reconstruction_loss += masked_mae_cal(X_tilde_1, total_input, observed_mask)
-        reconstruction_loss += masked_mae_cal(X_tilde_2, total_input, observed_mask)
-        final_reconstruction_MAE = masked_mae_cal(X_tilde_3, total_input, observed_mask)
-        reconstruction_loss += final_reconstruction_MAE
-        reconstruction_loss /= 3
+        results = {}
+        if self.training:
+            # Training
+            # conditional_mask = self.get_randmask(observed_mask)
+            conditional_mask = gt_mask
 
-        if (self.MIT or not self.training):
-            # have to cal imputation loss in the val stage
-            indicating_mask = observed_mask - gt_mask
-
-            imputation_MAE = masked_mae_cal(
-                X_tilde_3, observed_data, indicating_mask
+            # training loss
+            results["loss"] = self.calc_loss(
+                observed_data=observed_data, 
+                conditional_mask=conditional_mask, 
+                observed_mask=observed_mask, 
             )
-        else:
-            imputation_MAE = torch.tensor(0.0)
+            
+        elif not self.training:
+            # Validating
+            conditional_mask = gt_mask
 
-        results["loss"] = self.reconstruction_loss_weight * reconstruction_loss + self.imputation_loss_weight * imputation_MAE
+            # validating loss
+            results["loss"] = self.calc_loss(
+                observed_data=observed_data, 
+                conditional_mask=conditional_mask, 
+                observed_mask=observed_mask, 
+            )
         return results["loss"]
-
-        # return {
-        #     "imputed_data": imputed_data,
-        #     # "reconstruction_loss": reconstruction_loss,
-        #     "imputation_loss": imputation_MAE,
-        #     # "reconstruction_MAE": final_reconstruction_MAE,
-        #     "imputation_MAE": imputation_MAE,
-        # }
     
     def evaluate(
             self,
@@ -252,25 +239,33 @@ class SAITS(nn.Module):
             res["gt_mask"],
             res["cut_length"],
         )
-        observed_data = observed_data.permute(0, 2, 1)
-        observed_mask = observed_mask.permute(0, 2, 1)
-        gt_mask = gt_mask.permute(0, 2, 1)
-        # reconstruction_loss = 0
-        total_input = observed_data * gt_mask
-        imputed_data, _ = self.impute(X=total_input, masks=observed_mask)
+        with torch.no_grad():
+            cond_mask = gt_mask
+            target_mask = observed_mask - cond_mask
 
-        target_mask = observed_mask - gt_mask
+            samples = self.impute(observed_data, cond_mask)
+            samples = samples.unsqueeze(1)  # (B, 1, F, T) batch_size, num_sampling_times, num_features, num_steps
 
-        for i in range(len(cut_length)):  # to avoid double evaluation
-            target_mask[i, ..., 0 : cut_length[i].item()] = 0
+            for i in range(len(cut_length)):  # to avoid double evaluation
+                target_mask[i, ..., 0 : cut_length[i].item()] = 0
+        return samples, observed_data, target_mask, observed_mask, observed_tp
 
-        # for process
-        imputed_data = imputed_data.unsqueeze(1)
+    def get_randmask(self, observed_mask):
+        rand_for_mask = torch.rand_like(observed_mask) * observed_mask
+        rand_for_mask = rand_for_mask.reshape(len(rand_for_mask), -1)
+        for i in range(len(observed_mask)):
+            sample_ratio = np.random.rand()  # missing ratio
+            num_observed = observed_mask[i].sum().item()
+            num_masked = round(num_observed * sample_ratio)
+            rand_for_mask[i][rand_for_mask[i].topk(num_masked).indices] = -1
+        cond_mask = (rand_for_mask > 0).reshape(observed_mask.shape).float()
+        return cond_mask
 
-        return imputed_data, observed_data, target_mask, observed_mask, observed_tp
+# def masked_mae_cal(inputs, target, mask):
+#     """calculate Mean Absolute Error"""
+#     return torch.sum(torch.abs(inputs - target) * mask) / (torch.sum(mask) + 1e-9)
 
-
-def masked_mae_cal(inputs, target, mask):
-    """calculate Mean Absolute Error"""
-    return torch.sum(torch.abs(inputs - target) * mask) / (torch.sum(mask) + 1e-9)
+# def masked_mse_cal(inputs, target, mask):
+#     """calculate Mean Squared Error"""
+#     return torch.sum(((inputs - target) * mask) ** 2) / (torch.sum(mask) + 1e-9)
     

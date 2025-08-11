@@ -1,183 +1,184 @@
 """
-Layer modules for self-attention models (Transformer and SAITS).
 
-If you use code in this repository, please cite our paper as below. Many thanks.
-
-@article{DU2023SAITS,
-title = {{SAITS: Self-Attention-based Imputation for Time Series}},
-journal = {Expert Systems with Applications},
-volume = {219},
-pages = {119619},
-year = {2023},
-issn = {0957-4174},
-doi = {https://doi.org/10.1016/j.eswa.2023.119619},
-url = {https://www.sciencedirect.com/science/article/pii/S0957417423001203},
-author = {Wenjie Du and David Cote and Yan Liu},
-}
-
-or
-
-Wenjie Du, David Cote, and Yan Liu. SAITS: Self-Attention-based Imputation for Time Series. Expert Systems with Applications, 219:119619, 2023. https://doi.org/10.1016/j.eswa.2023.119619
 """
 
 # Created by Wenjie Du <wenjay.du@gmail.com>
-# License: MIT
+# License: BSD-3-Clause
 
+from typing import Optional, Tuple
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
+
+from ..transformer.layers import TransformerEncoderLayer
+from  ..transformer.attention import ScaledDotProductAttention
+from ..transformer.embeddings import PositionalEncoding
 
 
-class ScaledDotProductAttention(nn.Module):
-    """scaled dot-product attention"""
+class SaitsEmbedding(nn.Module):
+    """The embedding method from the SAITS paper :cite:`du2023SAITS`.
 
-    def __init__(self, temperature, attn_dropout=0.1):
-        super().__init__()
-        self.temperature = temperature
-        self.dropout = nn.Dropout(attn_dropout)
+    Parameters
+    ----------
+    d_in :
+        The input dimension.
 
-    def forward(self, q, k, v, attn_mask=None):
-        attn = torch.matmul(q / self.temperature, k.transpose(2, 3))
-        if attn_mask is not None:
-            attn = attn.masked_fill(attn_mask == 1, -1e9)
-        attn = self.dropout(F.softmax(attn, dim=-1))
-        output = torch.matmul(attn, v)
-        return output, attn
+    d_out :
+        The output dimension.
 
+    with_pos :
+        Whether to add positional encoding.
 
-class MultiHeadAttention(nn.Module):
-    """original Transformer multi-head attention"""
+    n_max_steps :
+        The maximum number of steps.
+        It only works when ``with_pos`` is True.
 
-    def __init__(self, num_heads, dim_model, dim_k, dim_v, attn_dropout):
-        super().__init__()
+    dropout :
+        The dropout rate.
 
-        self.n_head = num_heads
-        self.d_k = dim_k
-        self.d_v = dim_v
+    """
 
-        self.w_qs = nn.Linear(dim_model, num_heads * dim_k, bias=False)
-        self.w_ks = nn.Linear(dim_model, num_heads * dim_k, bias=False)
-        self.w_vs = nn.Linear(dim_model, num_heads * dim_v, bias=False)
-
-        self.attention = ScaledDotProductAttention(dim_k**0.5, attn_dropout)
-        self.fc = nn.Linear(num_heads * dim_v, dim_model, bias=False)
-
-    def forward(self, q, k, v, attn_mask=None):
-        d_k, d_v, n_head = self.d_k, self.d_v, self.n_head
-        sz_b, len_q, len_k, len_v = q.size(0), q.size(1), k.size(1), v.size(1)
-
-        # Pass through the pre-attention projection: b x lq x (n*dv)
-        # Separate different heads: b x lq x n x dv
-        q = self.w_qs(q).view(sz_b, len_q, n_head, d_k)
-        k = self.w_ks(k).view(sz_b, len_k, n_head, d_k)
-        v = self.w_vs(v).view(sz_b, len_v, n_head, d_v)
-
-        # Transpose for attention dot product: b x n x lq x dv
-        q, k, v = q.transpose(1, 2), k.transpose(1, 2), v.transpose(1, 2)
-
-        if attn_mask is not None:
-            # this mask is imputation mask, which is not generated from each batch, so needs broadcasting on batch dim
-            attn_mask = attn_mask.unsqueeze(0).unsqueeze(
-                1
-            )  # For batch and head axis broadcasting.
-
-        v, attn_weights = self.attention(q, k, v, attn_mask)
-
-        # Transpose to move the head dimension back: b x lq x n x dv
-        # Combine the last two dimensions to concatenate all the heads together: b x lq x (n*dv)
-        v = v.transpose(1, 2).contiguous().view(sz_b, len_q, -1)
-        v = self.fc(v)
-        return v, attn_weights
-
-
-class PositionWiseFeedForward(nn.Module):
-    def __init__(self, dim_model, dim_hidden, dropout=0.1):
-        super().__init__()
-        self.layer_norm = nn.LayerNorm(dim_model, eps=1e-6)
-        self.w_1 = nn.Linear(dim_model, dim_hidden)
-        self.w_2 = nn.Linear(dim_hidden, dim_model)
-        self.dropout = nn.Dropout(dropout)
-
-    def forward(self, x):
-        residual = x
-        x = self.layer_norm(x)
-        x = self.w_2(F.relu(self.w_1(x)))
-        x = self.dropout(x)
-        x += residual
-        return x
-
-
-class EncoderLayer(nn.Module):
     def __init__(
         self,
-        dim_time,
-        dim_feature,
-        dim_model,
-        dim_hidden, # dim_inner
-        num_heads, # num_heads
-        dim_k,
-        dim_v,
-        dropout=0.1,
-        attn_dropout=0.1,
-        diagonal_attention_mask=True,
-        device=None,
+        d_in: int,
+        d_out: int,
+        with_pos: bool,
+        n_max_steps: int = 1000,
+        dropout: float = 0,
     ):
-        super(EncoderLayer, self).__init__()
+        super().__init__()
+        self.with_pos = with_pos
+        self.dropout_rate = dropout
 
-        self.diagonal_attention_mask = diagonal_attention_mask
-        self.device = device
-        self.dim_time = dim_time
-        self.d_feature = dim_feature
+        self.embedding_layer = nn.Linear(d_in, d_out)
+        self.position_enc = PositionalEncoding(d_out, n_positions=n_max_steps) if with_pos else None
+        self.dropout = nn.Dropout(p=dropout) if dropout > 0 else None
 
-        self.layer_norm = nn.LayerNorm(dim_model)
-        self.slf_attn = MultiHeadAttention(num_heads, dim_model, dim_k, dim_v, attn_dropout) # nn.MultiheadAttention(dim_model, num_heads, dropout=dropout)
-        self.dropout = nn.Dropout(dropout)
-        self.pos_ffn = PositionWiseFeedForward(dim_model, dim_hidden, dropout)
+    def forward(self, X, missing_mask=None):
+        if missing_mask is not None:
+            X = torch.cat([X, missing_mask], dim=2)
 
-    def forward(self, enc_input):
-        if self.diagonal_attention_mask:
-            mask_time = torch.eye(self.dim_time).to(self.device)
-        else:
-            mask_time = None
+        X_embedding = self.embedding_layer(X)
 
-        residual = enc_input
-        # here we apply LN before attention cal, namely Pre-LN, refer paper https://arxiv.org/abs/2002.04745
-        enc_input = self.layer_norm(enc_input)
-        enc_output, attn_weights = self.slf_attn(
-            enc_input, enc_input, enc_input, attn_mask=mask_time
+        if self.with_pos:
+            X_embedding = self.position_enc(X_embedding)
+        if self.dropout_rate > 0:
+            X_embedding = self.dropout(X_embedding)
+
+        return X_embedding
+
+
+class BackboneSAITS(nn.Module):
+    def __init__(
+        self,
+        n_steps: int,
+        n_features: int,
+        n_layers: int,
+        d_model: int,
+        n_heads: int,
+        d_k: int,
+        d_v: int,
+        d_ffn: int,
+        dropout: float,
+        attn_dropout: float,
+    ):
+        super().__init__()
+
+        # concatenate the feature vector and missing mask, hence double the number of features
+        actual_n_features = n_features * 2
+
+        # for the 1st block
+        self.embedding_1 = SaitsEmbedding(
+            actual_n_features,
+            d_model,
+            with_pos=True,
+            n_max_steps=n_steps,
+            dropout=dropout,
         )
-        enc_output = self.dropout(enc_output)
-        enc_output += residual
-
-        enc_output = self.pos_ffn(enc_output)
-        return enc_output, attn_weights
-
-
-class PositionalEncoding(nn.Module):
-    def __init__(self, d_hid, n_position=200):
-        super(PositionalEncoding, self).__init__()
-        # Not a parameter
-        self.register_buffer(
-            "pos_table", self._get_sinusoid_encoding_table(n_position, d_hid)
-        )
-
-    def _get_sinusoid_encoding_table(self, n_position, d_hid):
-        """Sinusoid position encoding table"""
-
-        def get_position_angle_vec(position):
-            return [
-                position / np.power(10000, 2 * (hid_j // 2) / d_hid)
-                for hid_j in range(d_hid)
+        self.layer_stack_for_first_block = nn.ModuleList(
+            [
+                TransformerEncoderLayer(
+                    ScaledDotProductAttention(d_k**0.5, attn_dropout),
+                    d_model,
+                    n_heads,
+                    d_k,
+                    d_v,
+                    d_ffn,
+                    dropout,
+                )
+                for _ in range(n_layers)
             ]
-
-        sinusoid_table = np.array(
-            [get_position_angle_vec(pos_i) for pos_i in range(n_position)]
         )
-        sinusoid_table[:, 0::2] = np.sin(sinusoid_table[:, 0::2])  # dim 2i
-        sinusoid_table[:, 1::2] = np.cos(sinusoid_table[:, 1::2])  # dim 2i+1
-        return torch.FloatTensor(sinusoid_table).unsqueeze(0)
+        self.reduce_dim_z = nn.Linear(d_model, n_features)
 
-    def forward(self, x):
-        return x + self.pos_table[:, : x.size(1)].clone().detach()
+        # for the 2nd block
+        self.embedding_2 = SaitsEmbedding(
+            actual_n_features,
+            d_model,
+            with_pos=True,
+            n_max_steps=n_steps,
+            dropout=dropout,
+        )
+        self.layer_stack_for_second_block = nn.ModuleList(
+            [
+                TransformerEncoderLayer(
+                    ScaledDotProductAttention(d_k**0.5, attn_dropout),
+                    d_model,
+                    n_heads,
+                    d_k,
+                    d_v,
+                    d_ffn,
+                    dropout,
+                )
+                for _ in range(n_layers)
+            ]
+        )
+
+        self.reduce_dim_beta = nn.Linear(d_model, n_features)
+        self.reduce_dim_gamma = nn.Linear(n_features, n_features)
+
+        # for delta decay factor
+        self.weight_combine = nn.Linear(n_features + n_steps, n_features)
+
+    def forward(self, X, missing_mask, attn_mask: Optional = None) -> Tuple[torch.Tensor, ...]:
+
+        # first DMSA block
+        enc_output = self.embedding_1(X, missing_mask)  # namely, term e in the math equation
+        first_DMSA_attn_weights = None
+        for encoder_layer in self.layer_stack_for_first_block:
+            enc_output, first_DMSA_attn_weights = encoder_layer(enc_output, attn_mask)
+        X_tilde_1 = self.reduce_dim_z(enc_output)
+        X_prime = missing_mask * X + (1 - missing_mask) * X_tilde_1
+
+        # second DMSA block
+        enc_output = self.embedding_2(X_prime, missing_mask)  # namely term alpha in math algo
+        second_DMSA_attn_weights = None
+        for encoder_layer in self.layer_stack_for_second_block:
+            enc_output, second_DMSA_attn_weights = encoder_layer(enc_output, attn_mask)
+        X_tilde_2 = self.reduce_dim_gamma(F.relu(self.reduce_dim_beta(enc_output)))
+
+        # attention-weighted combine
+        copy_second_DMSA_weights = second_DMSA_attn_weights.clone()
+        copy_second_DMSA_weights = copy_second_DMSA_weights.squeeze(dim=1)  # namely term A_hat in Eq.
+        if len(copy_second_DMSA_weights.shape) == 4:
+            # if having more than 1 head, then average attention weights from all heads
+            copy_second_DMSA_weights = torch.transpose(copy_second_DMSA_weights, 1, 3)
+            copy_second_DMSA_weights = copy_second_DMSA_weights.mean(dim=3)
+            copy_second_DMSA_weights = torch.transpose(copy_second_DMSA_weights, 1, 2)
+
+        # namely term eta
+        combining_weights = torch.sigmoid(
+            self.weight_combine(torch.cat([missing_mask, copy_second_DMSA_weights], dim=2))
+        )
+        # combine X_tilde_1 and X_tilde_2
+        X_tilde_3 = (1 - combining_weights) * X_tilde_2 + combining_weights * X_tilde_1
+
+        return (
+            X_tilde_1,
+            X_tilde_2,
+            X_tilde_3,
+            first_DMSA_attn_weights,
+            second_DMSA_attn_weights,
+            combining_weights,
+        )

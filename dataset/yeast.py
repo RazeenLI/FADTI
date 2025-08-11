@@ -1,63 +1,37 @@
 import pickle
-
 import os
-import re
 import numpy as np
 import pandas as pd
 from torch.utils.data import DataLoader, Dataset
-from utils.utils import sample_mask, data_normalize, StandardScaler, MaskedStandardScaler
-import pickle
-# from sklearn.preprocessing import StandardScaler
+from utils.utils import sample_mask, MaskedStandardScaler
 
 def create_data():
-    # 1. 指定用于插补的字段
+    # 1. Specify the fields to use for imputation
     imputation_features = [
         "length", "width", "area", "perimeter",
         "fluo1", "sharpness", "cell_count"
     ]
 
-    # 2. 读取 .pkl 文件
+    # 2. Reading a .pkl file
     file_path = './data/YeastSet2.pkl'
     with open(file_path, 'rb') as f:
         data = pickle.load(f)
     
-    # 3. 提取 raw_dataset 并拼接指定字段
+    # 3. Extract raw_dataset and concatenate specified fields
     raw_dataset = data['raw_dataset']
     observed_values = np.concatenate(
         [np.array(raw_dataset[feat]) for feat in imputation_features],
         axis=-1  # [N, T, 1] → [N, T, F]
     )
 
-    # 4. 统一时间步数（只保留完整样本）
+    # 4. Unify the number of time steps (only keep complete samples)
     expected_time_steps = observed_values[0].shape[0]
     observed_values = [
         sample for sample in observed_values if sample.shape[0] == expected_time_steps
     ]
 
-    # 5. 转为 numpy 数组 [N, T, F]
+    # 5. Convert to numpy array [N, T, F]
     observed_values = np.stack(observed_values, axis=0)
-
-
-    # df = pd.read_csv('./data/ETTm1.csv')
-
-    # df['date'] = pd.to_datetime(df['date'], format='%Y-%m-%d %H:%M:%S', errors='coerce')
-    # df['day'] = df['date'].dt.date
-    # df = df.sort_values('date')
-    # feature_cols = df.columns.drop(['date', 'day'])
-
-    # grouped = df.groupby('day')
-    # observed_values = []
-    # for day, group in grouped:
-    #     group = group.sort_values('date')
-    #     arr = group[feature_cols].to_numpy()
-    #     observed_values.append(arr)
-    # observed_values
-
-    # # 6. 以第一天的时间步数作为标准，筛选出符合要求的天的数据
-    # expected_time_steps = observed_values[0].shape[0]
-    # observed_values = [arr for arr in observed_values if arr.shape[0] == expected_time_steps]
-
-    # observed_values = np.stack(observed_values, axis=0)
 
     return observed_values 
 

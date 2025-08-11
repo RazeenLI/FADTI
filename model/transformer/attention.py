@@ -1,16 +1,3 @@
-"""
-The implementation of the modules for Transformer :cite:`vaswani2017Transformer`
-
-Notes
------
-This implementation is inspired by the official one https://github.com/WenjieDu/SAITS,
-and https://github.com/jadore801120/attention-is-all-you-need-pytorch.
-
-"""
-
-# Created by Wenjie Du <wenjay.du@gmail.com>
-# License: BSD-3-Clause
-
 from abc import abstractmethod
 from typing import Tuple, Optional
 
@@ -67,32 +54,6 @@ class ScaledDotProductAttention(AttentionOperator):
         attn_mask: Optional[torch.Tensor] = None,
         **kwargs,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Forward processing of the scaled dot-product attention.
-
-        Parameters
-        ----------
-        q:
-            Query tensor.
-
-        k:
-            Key tensor.
-
-        v:
-            Value tensor.
-
-        attn_mask:
-            Masking tensor for the attention map. The shape should be [batch_size, n_heads, n_steps, n_steps].
-            0 in attn_mask means values at the according position in the attention map will be masked out.
-
-        Returns
-        -------
-        output:
-            The result of Value multiplied with the scaled dot-product attention map.
-
-        attn:
-            The scaled dot-product attention map.
-
-        """
         # q, k, v all have 4 dimensions [batch_size, n_steps, n_heads, d_tensor]
         # d_tensor could be d_q, d_k, d_v
 
@@ -118,26 +79,6 @@ class ScaledDotProductAttention(AttentionOperator):
 
 
 class MultiHeadAttention(nn.Module):
-    """Transformer multi-head attention module.
-
-    Parameters
-    ----------
-    attn_opt:
-        The attention operator, e.g. the self-attention proposed in Transformer.
-
-    d_model:
-        The dimension of the input tensor.
-
-    n_heads:
-        The number of heads in multi-head attention.
-
-    d_k:
-        The dimension of the key and query tensor.
-
-    d_v:
-        The dimension of the value tensor.
-
-    """
 
     def __init__(
         self,
@@ -168,32 +109,6 @@ class MultiHeadAttention(nn.Module):
         attn_mask: Optional[torch.Tensor],
         **kwargs,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Forward processing of the multi-head attention module.
-
-        Parameters
-        ----------
-        q:
-            Query tensor.
-
-        k:
-            Key tensor.
-
-        v:
-            Value tensor.
-
-        attn_mask:
-            Masking tensor for the attention map. The shape should be [batch_size, n_heads, n_steps, n_steps].
-            0 in attn_mask means values at the according position in the attention map will be masked out.
-
-        Returns
-        -------
-        v:
-            The output of the multi-head attention layer.
-
-        attn_weights:
-            The attention map.
-
-        """
         # the shapes of q, k, v are the same [batch_size, n_steps, d_model]
 
         batch_size, q_len = q.size(0), q.size(1)

@@ -1,20 +1,9 @@
 import copy
 import numpy as np
-# import scipy.sparse as sp
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
-# from generate_adj import *
-
-# # in Graph-wavenet
-# def asym_adj(adj):
-#     adj = sp.coo_matrix(adj)
-#     rowsum = np.array(adj.sum(1)).flatten()
-#     d_inv = np.power(rowsum, -1).flatten()
-#     d_inv[np.isinf(d_inv)] = 0.
-#     d_mat= sp.diags(d_inv)
-#     return d_mat.dot(adj).astype(np.float32).todense()
 
 def get_torch_trans(heads=8, layers=1, channels=64):
     encoder_layer = TransformerEncoderLayer_QKV(

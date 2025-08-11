@@ -76,13 +76,6 @@ class TimeMixer(nn.Module):
         reconstruction = self.model.imputation(observed_data, None)
 
         imputed_data = conditional_mask * observed_data + (1 - conditional_mask) * reconstruction
-        # results = {
-        #     "imputation": imputed_data,
-        #     "reconstruction": reconstruction,
-        # }
-        # print("imputed_data.shape before permute", imputed_data.shape)
-        # imputed_data.permute(0, 2, 1)
-        # print("imputed_data.shape", imputed_data.shape)
 
         return imputed_data.permute(0, 2, 1)
     
@@ -97,11 +90,6 @@ class TimeMixer(nn.Module):
         observed_data = observed_data.permute(0, 2, 1) 
         conditional_mask = conditional_mask.permute(0, 2, 1)
         observed_mask = observed_mask.permute(0, 2, 1)
-
-        # embedding
-        # input_data = self.enc_embedding(observed_data)  # [B,T,C]
-        # # TimesNet processing
-        # enc_out = self.model(input_data)
 
         # TimesMixer processing
         reconstruction = self.model.imputation(observed_data, None)

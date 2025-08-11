@@ -1,10 +1,3 @@
-"""
-
-"""
-
-# Created by Wenjie Du <wenjay.du@gmail.com>
-# License: BSD-3-Clause
-
 from typing import Tuple, Optional
 
 import torch
@@ -15,20 +8,7 @@ from .attention import MultiHeadAttention, AttentionOperator
 
 
 class PositionWiseFeedForward(nn.Module):
-    """Position-wise feed forward network (FFN) in Transformer.
 
-    Parameters
-    ----------
-    d_in:
-        The dimension of the input tensor.
-
-    d_hid:
-        The dimension of the hidden layer.
-
-    dropout:
-        The dropout rate.
-
-    """
 
     def __init__(self, d_in: int, d_hid: int, dropout: float = 0.1):
         super().__init__()
@@ -38,18 +18,6 @@ class PositionWiseFeedForward(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Forward processing of the position-wise feed forward network.
-
-        Parameters
-        ----------
-        x:
-            Input tensor.
-
-        Returns
-        -------
-        x:
-            Output tensor.
-        """
         # save the original input for the later residual connection
         residual = x
         # the 1st linear processing and ReLU non-linear projection
@@ -66,32 +34,6 @@ class PositionWiseFeedForward(nn.Module):
 
 
 class TransformerEncoderLayer(nn.Module):
-    """Transformer encoder layer.
-
-    Parameters
-    ----------
-    attn_opt:
-        The attention operator for the multi-head attention module in the encoder layer.
-
-    d_model:
-        The dimension of the input tensor.
-
-    n_heads:
-        The number of heads in multi-head attention.
-
-    d_k:
-        The dimension of the key and query tensor.
-
-    d_v:
-        The dimension of the value tensor.
-
-    d_ffn:
-        The dimension of the hidden layer.
-
-    dropout:
-        The dropout rate.
-
-    """
 
     def __init__(
         self,
@@ -121,25 +63,6 @@ class TransformerEncoderLayer(nn.Module):
         src_mask: Optional[torch.Tensor] = None,
         **kwargs,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Forward processing of the encoder layer.
-
-        Parameters
-        ----------
-        enc_input:
-            Input tensor.
-
-        src_mask:
-            Masking tensor for the attention map. The shape should be [batch_size, n_heads, n_steps, n_steps].
-
-        Returns
-        -------
-        enc_output:
-            Output tensor.
-
-        attn_weights:
-            The attention map.
-
-        """
         enc_output, attn_weights = self.slf_attn(
             enc_input,
             enc_input,
@@ -160,35 +83,6 @@ class TransformerEncoderLayer(nn.Module):
 
 
 class TransformerDecoderLayer(nn.Module):
-    """Transformer decoder layer.
-
-    Parameters
-    ----------
-    slf_attn_opt:
-        The attention operator for the multi-head attention module in the decoder layer.
-
-    enc_attn_opt:
-        The attention operator for the encoding multi-head attention module in the decoder layer.
-
-    d_model:
-        The dimension of the input tensor.
-
-    n_heads:
-        The number of heads in multi-head attention.
-
-    d_k:
-        The dimension of the key and query tensor.
-
-    d_v:
-        The dimension of the value tensor.
-
-    d_ffn:
-        The dimension of the hidden layer.
-
-    dropout:
-        The dropout rate.
-
-    """
 
     def __init__(
         self,
@@ -226,36 +120,6 @@ class TransformerDecoderLayer(nn.Module):
         dec_enc_attn_mask: Optional[torch.Tensor] = None,
         **kwargs,
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Forward processing of the decoder layer.
-
-        Parameters
-        ----------
-        dec_input:
-            Input tensor.
-
-        enc_output:
-            Output tensor from the encoder.
-
-        slf_attn_mask:
-            Masking tensor for the self-attention module.
-            The shape should be [batch_size, n_heads, n_steps, n_steps].
-
-        dec_enc_attn_mask:
-            Masking tensor for the encoding attention module.
-            The shape should be [batch_size, n_heads, n_steps, n_steps].
-
-        Returns
-        -------
-        dec_output:
-            Output tensor.
-
-        dec_slf_attn:
-            The self-attention map.
-
-        dec_enc_attn:
-            The encoding attention map.
-
-        """
         dec_output, dec_slf_attn = self.slf_attn(
             dec_input,
             dec_input,

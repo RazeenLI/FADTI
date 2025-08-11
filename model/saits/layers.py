@@ -1,10 +1,3 @@
-"""
-
-"""
-
-# Created by Wenjie Du <wenjay.du@gmail.com>
-# License: BSD-3-Clause
-
 from typing import Optional, Tuple
 
 import torch
@@ -17,28 +10,6 @@ from ..transformer.embeddings import PositionalEncoding
 
 
 class SaitsEmbedding(nn.Module):
-    """The embedding method from the SAITS paper :cite:`du2023SAITS`.
-
-    Parameters
-    ----------
-    d_in :
-        The input dimension.
-
-    d_out :
-        The output dimension.
-
-    with_pos :
-        Whether to add positional encoding.
-
-    n_max_steps :
-        The maximum number of steps.
-        It only works when ``with_pos`` is True.
-
-    dropout :
-        The dropout rate.
-
-    """
-
     def __init__(
         self,
         d_in: int,

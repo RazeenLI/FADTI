@@ -1,29 +1,3 @@
-"""
-SAITS model for time-series imputation.
-
-If you use code in this repository, please cite our paper as below. Many thanks.
-
-@article{DU2023SAITS,
-title = {{SAITS: Self-Attention-based Imputation for Time Series}},
-journal = {Expert Systems with Applications},
-volume = {219},
-pages = {119619},
-year = {2023},
-issn = {0957-4174},
-doi = {https://doi.org/10.1016/j.eswa.2023.119619},
-url = {https://www.sciencedirect.com/science/article/pii/S0957417423001203},
-author = {Wenjie Du and David Cote and Yan Liu},
-}
-
-or
-
-Wenjie Du, David Cote, and Yan Liu. SAITS: Self-Attention-based Imputation for Time Series. Expert Systems with Applications, 219:119619, 2023. https://doi.org/10.1016/j.eswa.2023.119619
-
-"""
-
-# Created by Wenjie Du <wenjay.du@gmail.com>
-# License: MIT
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -125,12 +99,6 @@ class SAITS(nn.Module):
         conditional_mask = conditional_mask.permute(0, 2, 1)
         observed_mask = observed_mask.permute(0, 2, 1)
 
-        # if (self.training and self.diagonal_attention_mask) or ((not self.training) and diagonal_attention_mask):
-        #     diagonal_attention_mask = (1 - torch.eye(self.n_steps)).to(self.device)
-        #     # then broadcast on the batch axis
-        #     diagonal_attention_mask = diagonal_attention_mask.unsqueeze(0)
-        # else:
-        #     diagonal_attention_mask = None
         if self.diagonal_attention_mask:
             mask_time = (1 - torch.eye(self.n_steps)).to(self.device).unsqueeze(0)
         else:
@@ -147,9 +115,6 @@ class SAITS(nn.Module):
             second_DMSA_attn_weights,
             combining_weights,
         ) = self.encoder(input_data, conditional_mask, mask_time)
-
-        # replace the observed part with values from X
-        # imputed_data = conditional_mask * observed_data + (1 - conditional_mask) * X_tilde_3
 
         reconstruction_loss = 0
 
@@ -260,12 +225,3 @@ class SAITS(nn.Module):
             rand_for_mask[i][rand_for_mask[i].topk(num_masked).indices] = -1
         cond_mask = (rand_for_mask > 0).reshape(observed_mask.shape).float()
         return cond_mask
-
-# def masked_mae_cal(inputs, target, mask):
-#     """calculate Mean Absolute Error"""
-#     return torch.sum(torch.abs(inputs - target) * mask) / (torch.sum(mask) + 1e-9)
-
-# def masked_mse_cal(inputs, target, mask):
-#     """calculate Mean Squared Error"""
-#     return torch.sum(((inputs - target) * mask) ** 2) / (torch.sum(mask) + 1e-9)
-    

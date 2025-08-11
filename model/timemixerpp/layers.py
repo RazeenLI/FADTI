@@ -1,10 +1,3 @@
-"""
-
-"""
-
-# Created by Wenjie Du <wenjay.du@gmail.com>
-# License: BSD-3-Clause
-
 import numpy as np
 import torch
 import torch.nn as nn

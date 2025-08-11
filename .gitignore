@@ -11,6 +11,8 @@ env/
 
 # Jupyter notebook checkpoints
 .ipynb_checkpoints/
+check*.py
+form*.py
 
 # Logs
 *.log

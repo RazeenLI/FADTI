@@ -1,11 +1,9 @@
 import pickle
-
 import os
-import re
 import numpy as np
 import pandas as pd
 from torch.utils.data import DataLoader, Dataset
-from utils.utils import sample_mask, data_normalize, StandardScaler, MaskedStandardScaler
+from utils.utils import sample_mask, MaskedStandardScaler
 
 def create_data():
     df = pd.read_csv('./data/weather.csv', parse_dates=['date'])
@@ -80,15 +78,6 @@ def get_dataloader(
     )
 
     # data normalization
-    # observed_values = np.nan_to_num(observed_values)
-    # # observed_values = data_normalize(observed_values, observed_masks, 21)
-    # # devide into three dataloader and return 
-    # dataset = Weather_Dataset(
-    #     observed_masks=observed_masks, 
-    #     observed_values=observed_values, 
-    #     gt_masks=gt_masks,
-    #     eval_length=num_steps
-    # )
     # indlist = np.arange(len(dataset))
     indlist = np.arange(len(observed_values))
 

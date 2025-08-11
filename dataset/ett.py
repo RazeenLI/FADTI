@@ -24,7 +24,7 @@ def create_data():
         observed_values.append(arr)
     observed_values
 
-    # 6. 以第一天的时间步数作为标准，筛选出符合要求的天的数据
+    # Use the first day's time steps as the standard to filter out the data of the day that meets the requirements
     expected_time_steps = observed_values[0].shape[0]
     observed_values = [arr for arr in observed_values if arr.shape[0] == expected_time_steps]
 
@@ -82,15 +82,6 @@ def get_dataloader(
     )
 
     # data normalization
-    # observed_values = np.nan_to_num(observed_values)
-    # observed_values = data_normalize(observed_values, observed_masks, 7)
-    # devide into three dataloader and return 
-    # dataset = ETT_Dataset(
-    #     observed_masks=observed_masks, 
-    #     observed_values=observed_values, 
-    #     gt_masks=gt_masks,
-    #     eval_length=num_steps
-    # )
     # indlist = np.arange(len(dataset))
     indlist = np.arange(len(observed_values))
 
@@ -159,10 +150,6 @@ class ETT_Dataset(Dataset):
             "timepoints": np.arange(self.eval_length),
             "next_data": self.observed_values[index + 1] if (index + 1 in self.use_index_list) else np.zeros_like(self.observed_values[index])  # 占位张量
         }
-        # if (index + 1 in self.use_index_list): #  and ((index + 1) < len(self.observed_values)):
-        #     s["next_data"] = self.observed_values[index + 1]
-        # else:
-        #     s["next_data"] = None
         return s
 
     def __len__(self):

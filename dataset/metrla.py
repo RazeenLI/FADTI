@@ -16,56 +16,21 @@ def create_data():
     data = df.values  # shape: (34272, 207)
     data[data == 0.0] = np.nan
 
-    # 每小时一个点：5分钟 × 12 = 1小时
-    interval = 12  # 12个时间步 = 1小时
+    # One point per hour: 5 minutes × 12 = 1 hour
+    interval = 12  # 12 time steps = 1 hour
     hourly_data = data[::interval]  # shape: [T_total // 12, 207]
 
-    # 每天24小时，只保留整天数据
+    # 24 hours a day, only retain the full day's data
     day_len = 24
     T_total = hourly_data.shape[0]
     num_full_days = T_total // day_len
-    hourly_data = hourly_data[:num_full_days * day_len]  # 去掉多余时间步
+    hourly_data = hourly_data[:num_full_days * day_len]  # Remove redundant time steps
     hourly_data = hourly_data.reshape(num_full_days, day_len, -1)  # shape: [num_days, 24, 207]
 
-    # 不再按 sensor 分组，全部保留
-    # 如果你仍希望展开为 [num_days * 1, 24, 207]，也可以 flatten 第一个维度：
+    # No longer group by sensor, keep all
     # hourly_data = hourly_data.reshape(-1, 24, 207)
 
     return hourly_data
-
-
-# def create_data():
-#     # df = pd.read_csv('./data/ETTm1.csv')
-#     df = pd.read_hdf("./data/metr_la/metr-la.h5")
-
-#     # 把 DataFrame 转成 NumPy 并把 0 替换为 NaN
-#     data = df.values  # shape: (34272, 207)
-#     data[data == 0.0] = np.nan
-
-#     # 每天 288 个时间步（5分钟 × 288 = 1天）
-#     T_total = data.shape[0]
-#     day_len = 288
-#     num_full_days = T_total // day_len
-#     data = data[:num_full_days * day_len]  # 保留整天
-#     data = data.reshape(num_full_days, day_len, -1)  # shape: [num_days, 288, 207]
-
-#     # 分组：每9个sensor一组
-#     group_size = 9
-#     num_groups = 5  # 取前五组（group 0~4）
-#     observed_values = []
-
-#     for i in range(num_groups):
-#         start_col = i * group_size
-#         end_col = start_col + group_size
-
-#         group_data = data[:, :, start_col:end_col]  # shape: [num_days, 288, 9]
-#         observed_values.append(group_data)
-
-#     # 合并所有组
-#     observed_values = np.concatenate(observed_values, axis=0)  # shape: [num_days * num_groups, 288, 9]
-#     # print("Final shape:", observed_values.shape)
-
-#     return observed_values 
 
 def get_data():
     # get total dataset, if not exit, create new dataset

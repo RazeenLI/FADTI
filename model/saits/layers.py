@@ -112,7 +112,7 @@ class BackboneSAITS(nn.Module):
         # for delta decay factor
         self.weight_combine = nn.Linear(n_features + n_steps, n_features)
 
-    def forward(self, X, missing_mask, attn_mask: Optional = None) -> Tuple[torch.Tensor, ...]:
+    def forward(self, X, missing_mask, attn_mask: None) -> Tuple[torch.Tensor, ...]:
 
         # first DMSA block
         enc_output = self.embedding_1(X, missing_mask)  # namely, term e in the math equation

@@ -2,6 +2,8 @@ import torch
 from torch import nn
 import math
 import numpy as np
+import torch.nn.functional as F
+
 
 class SeriesDecomposer(nn.Module):
     def __init__(
@@ -32,7 +34,29 @@ class SeriesDecomposer(nn.Module):
         res = x - trend
         return res, trend
 
-class FBMLinear(nn.Module):
+class DummyExtension(nn.Module):
+    def __init__(self, context_window, target_window):
+        super().__init__()
+        self.context_window = context_window
+        self.target_window = target_window
+
+    def forward(self, x):
+        """
+        x: [B, C, context_window]
+        output: [B, C, target_window]
+        不对输入内容进行任何变换，只进行裁剪或 padding
+        """
+        T = x.size(-1)
+        if T > self.target_window:
+            return x[..., :self.target_window]  # 裁剪右边
+        elif T < self.target_window:
+            pad_len = self.target_window - T
+            return F.pad(x, (0, pad_len))  # 右侧 padding 0
+        else:
+            return x
+        
+
+class DFTBasisExtension(nn.Module):
     def __init__(
             self,
             context_window,
@@ -70,8 +94,8 @@ class FBMLinear(nn.Module):
         norm = x.size()[-1]
         frequency = torch.fft.rfft(x, axis=-1)
         x = frequency/(norm)*2
-        basis_cos=torch.einsum('bkp,pt->bkpt', x.real, self.cos)
-        basis_sin=torch.einsum('bkp,pt->bkpt', x.imag, self.sin)
+        basis_cos=torch.einsum('bcf,ft->bcft', x.real, self.cos)
+        basis_sin=torch.einsum('bcf,ft->bcft', x.imag, self.sin)
 
         x = basis_cos + basis_sin
         x = self.flatten_layer(x)
@@ -79,37 +103,152 @@ class FBMLinear(nn.Module):
         x = self.linear_layer(x)
         return x
     
-class SpectralConv1dLinear(nn.Module):
+class STFTBiasProjection(nn.Module):
+    def __init__(
+            self,
+            context_window,
+            target_window,
+            dropout=0.1
+    ):
+        super().__init__()
+        self.context_window = context_window
+        self.hop_length = context_window // 2
+        # 1）预先生成一个窗函数
+        self.register_buffer('window', torch.hann_window(context_window))
+
+        # 2）对应 STFT 得到的频率 bin 数
+        freq_bins = context_window // 2 + 1  
+        # 线性层输入维度 = freq_bins × frame_count
+        frame_count = ((target_window or context_window) - context_window) // self.hop_length + 1
+
+        N = torch.arange(frame_count).float()  # time frame indices
+        omega = 2 * math.pi * torch.arange(freq_bins).float().unsqueeze(1) / frame_count  # angular frequency matrix
+        cos = torch.cos(omega * N)
+        sin = -torch.sin(omega * N)
+        cos[0] *= 0.5  # match DFT basis
+        sin[0] *= 0.5
+
+        self.register_buffer('cos', cos)
+        self.register_buffer('sin', sin)
+
+        linear_input = freq_bins * frame_count
+        self.flatten = nn.Flatten(start_dim=-2)
+        self.dropout = nn.Dropout(dropout)
+        self.linear = nn.Linear(linear_input, target_window)
+
+    def forward(self, x):
+        # x: (B, C, T), 最后一维是 time
+        # —— 把 DFT 换成 STFT —— 
+        # x: (B, C, T)
+        B, C, T = x.shape
+        # 1) STFT per channel -> (B, C, freq_bins, frames)
+        x2d = x.reshape(B*C, T)
+        X_stft = torch.stft(
+            x2d,
+            n_fft=self.context_window,
+            hop_length=self.hop_length,
+            window=self.window,
+            return_complex=True,
+            center=False
+        ) # (B*C, freq_bins, frames)
+        # reshape (B, C, F, L)
+        energy = self.window.pow(2).sum()
+        X_stft = X_stft / energy  # normalize by window energy
+
+        freq_bins, frames = X_stft.size(1), X_stft.size(2)
+        X_stft = X_stft.reshape(B, C, freq_bins, frames)
+
+        # 保持原来基于实部/虚部的扩展逻辑（可选）
+        basis_cos = torch.einsum('bcfl,fl->bcfl', X_stft.real, self.cos) # X_stft.real # (B, C, freq_bins, frames) real
+        basis_sin = torch.einsum('bcfl,fl->bcfl', X_stft.imag, self.sin) # X_stft.imag # imag
+        x = basis_cos + basis_sin
+
+        # —— 扁平 & 投影 —— 
+        x = self.flatten(x)   # (B, C, freq_bins*frames*2)
+        x = self.dropout(x)
+        x = self.linear(x)    # (B, C, target_window)
+        return x
+
+class FrSSTBiasProjection(nn.Module):
+    """
+    Fourier Synchrosqueezed Transform (FrSST) bias projection for univariate signals.
+    """
     def __init__(
             self, 
-            in_channels, 
-            out_channels, 
             context_window, 
             target_window, 
-            modes=16, 
             dropout=0.1
-        ):
+    ):
         super().__init__()
-        self.modes = modes
-        self.in_channels = in_channels
-        self.out_channels = out_channels
         self.context_window = context_window
-        self.target_window = target_window
+        self.hop_length = context_window // 2
+        # Hann window for STFT
+        self.register_buffer('window', torch.hann_window(self.context_window))
+        
+        # Number of frequency bins in STFT output
+        self.freq_bins = self.context_window // 2 + 1
+        frame_count = ((target_window or context_window) - context_window) // self.hop_length + 1
 
-        self.weights = nn.Parameter(torch.randn(in_channels, out_channels, self.modes, dtype=torch.cfloat))
-        self.dropout = nn.Dropout(p=dropout)
-        self.linear = nn.Linear(context_window, target_window)
+        N = torch.arange(frame_count).float()  # time frame indices
+        omega = 2 * math.pi * torch.arange(self.freq_bins).float().unsqueeze(1) / frame_count  # angular frequency matrix
+        cos = torch.cos(omega * N)
+        sin = -torch.sin(omega * N)
+        cos[0] *= 0.5  # match DFT basis
+        sin[0] *= 0.5
+
+        self.register_buffer('cos', cos)
+        self.register_buffer('sin', sin)
+        
+        # Linear mapping from F bins to target_window
+        self.flatten = nn.Flatten(start_dim=-2)  # flatten C and freq_bins
+        self.dropout = nn.Dropout(dropout)
+        self.linear = nn.Linear(self.freq_bins * frame_count, target_window)
 
     def forward(self, x):
         # x: (B, C, T)
-        x_ft = torch.fft.rfft(x, dim=-1)  # (B, C, F)
-        out_ft = torch.zeros(x.size(0), self.out_channels, x_ft.shape[-1], dtype=torch.cfloat, device=x.device)
-        out_ft[:, :, :self.modes] = torch.einsum('bci,cio->bio', x_ft[:, :, :self.modes], self.weights)
+        B, C, T = x.shape
+        # 1) STFT per channel -> (B, C, freq_bins, frames)
+        x2d = x.reshape(B*C, T)
+        X_stft = torch.stft(
+            x2d,
+            n_fft=self.context_window,
+            hop_length=self.hop_length,
+            window=self.window,
+            return_complex=True,
+            center=False
+        ) # (B*C, freq_bins, frames)
+        # reshape (B, C, F, L)
+        energy = self.window.pow(2).sum()
+        X_stft = X_stft / energy  # normalize by window energy
+        freq_bins, frames = X_stft.size(1), X_stft.size(2)
+        X_stft = X_stft.reshape(B, C, freq_bins, frames)
+            
+        # 2) Estimate instantaneous frequency
+        left  = X_stft[..., 1:2].flip(-1)       # (B, C, F, 1)
+        right = X_stft[..., -2:-1].flip(-1)     # (B, C, F, 1)
+        X_pad = torch.cat([left, X_stft, right], dim=-1)  # (B,C,F,L+2)
 
-        x_time = torch.fft.irfft(out_ft, n=self.context_window, dim=-1)  # (B, C_out, T)
-        x_time = self.dropout(x_time)
-        x_time = x_time.permute(0, 2, 1)  # (B, T, C_out)
-        return self.linear(x_time)  # (B, T, target_window)
+        dG = (X_pad[..., 2:] - X_pad[..., :-2]) / 2.0
+        inst_freq = (dG / (1j * X_stft)).real
+        bin_indices = (inst_freq * (self.context_window / (2*math.pi))).round().long()
+        bin_indices = bin_indices.clamp(0, self.freq_bins - 1)
+        
+        # 3) Synchrosqueeze: reassign energy -> (B, C, freq_bins, frames)
+        S = torch.zeros_like(X_stft)
+        S = S.scatter_add(dim=2, index=bin_indices, src=X_stft)
+        
+        # 保持原来基于实部/虚部的扩展逻辑（可选）
+        basis_cos = torch.einsum('bcfl,fl->bcfl', S.real, self.cos) # X_stft.real # (B, C, freq_bins, frames) real
+        basis_sin = torch.einsum('bcfl,fl->bcfl', S.imag, self.sin) # X_stft.imag # imag
+        S_proj = basis_cos + basis_sin
+        
+        # 5) Flatten channels & freq_bins 
+        S_flat = self.flatten(S_proj)
+        out = self.dropout(S_flat)
+        # self.linear = nn.Linear(self.freq_bins * C, self.target_dim).to(out.device)
+        out = self.linear(out)
+        return out
+
 
 
 class FrSSTLike(nn.Module):
@@ -172,44 +311,46 @@ class SpectralReprModule(nn.Module):
             target_window, 
             num_channels,
             kernel_size=24,
-            method="fbm"
+            method="dft"
         ):
         super().__init__()
         self.decomposer_layer = SeriesDecomposer(kernel_size=kernel_size)
+        self.method = method
 
-        if method == "frsst":
-            self.res_layer = FrSSTLike(
-                in_channels=num_channels,
-                time_steps=context_window,
+        if method == "none":
+            self.res_layer = DummyExtension(context_window * 2 // 3, target_window)
+            self.trend_layer = DummyExtension(context_window * 2 // 3, target_window)
+        elif method == "frsst":
+            self.res_layer = FrSSTBiasProjection(
+                context_window=context_window * 2 // 3,
+                target_window=target_window
             )
-            self.trend_layer = FrSSTLike(
-                in_channels=num_channels,
-                time_steps=context_window,
+            self.trend_layer = FrSSTBiasProjection(
+                context_window=context_window * 2 // 3,
+                target_window=target_window
             )
-        elif method == "fsst":
-            self.res_layer = FrSSTLike(
-                in_channels=num_channels,
-                time_steps=context_window,
-                alpha=0,
+        elif method == "stft":
+            self.res_layer = STFTBiasProjection(
+                context_window=context_window * 2 // 3,
+                target_window=target_window
             )
-            self.trend_layer = FrSSTLike(
-                in_channels=num_channels,
-                time_steps=context_window,
-                alpha=0
+            self.trend_layer = STFTBiasProjection(
+                context_window=context_window * 2 // 3,
+                target_window=target_window
             )
         else:
-            self.res_layer = FBMLinear(
+            self.res_layer = DFTBasisExtension(
                 context_window=context_window,
                 target_window=target_window
             )
-            self.trend_layer = FBMLinear(
+            self.trend_layer = DFTBasisExtension(
                 context_window=context_window,
                 target_window=target_window
             )
 
     def forward(self, x):
-        res, trend = self.decomposer_layer(x)
-        res = res.permute(0, 2, 1)
+        res, trend = self.decomposer_layer(x) # # batch_size * num_features, num_steps, num_channels 
+        res = res.permute(0, 2, 1) # batch_size * num_features, num_channels, num_steps
         trend = trend.permute(0, 2, 1)
         res = self.res_layer(res)
         trend = self.trend_layer(trend)
@@ -226,11 +367,11 @@ class FourierBasisMapping(nn.Module):
         super().__init__()
 
         self.decomposer_layer = SeriesDecomposer(kernel_size=kernel_size)
-        self.res_fbm_layer = FBMLinear(
+        self.res_fbm_layer = DFTBasisExtension(
             context_window=context_window,
             target_window=target_window
         )
-        self.trend_fbm_layer = FBMLinear(
+        self.trend_fbm_layer = DFTBasisExtension(
             context_window=context_window,
             target_window=target_window
         )

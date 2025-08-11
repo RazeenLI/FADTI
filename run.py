@@ -10,6 +10,9 @@ import yaml
 import os
 from model.process import Process
 from model.fadti.model import FADTI
+from torch.optim import AdamW
+
+from utils.loaders import get_dataloader
 
 
 # Load Arguments
@@ -49,34 +52,11 @@ config = {**config_model, **config_data}
 print(json.dumps(config, indent=4))
 
 # Load Data
-data_info = "None"
-if args.data == "ett":
-    from dataset.ett import get_dataloader
-    train_loader, valid_loader, test_loader = get_dataloader(
-        seed=config["data"]["seed"],
-        nfold=args.nfold,
-        batch_size=config["data"]["batch_size"],
-        missing_ratio=args.missrate, # config["data"]["test_missing_ratio"],
-        missing_pattern=args.misspattern, # config["data"]["missing_pattern"],
-        num_steps=config["data"]["num_steps"],
-    )
-elif args.data == "weather":
-    from dataset.weather import get_dataloader
-    train_loader, valid_loader, test_loader = get_dataloader(
-        seed=config["data"]["seed"],
-        nfold=args.nfold,
-        batch_size=config["data"]["batch_size"],
-        missing_ratio=args.missrate, # config["data"]["test_missing_ratio"],
-        missing_pattern=args.misspattern, # config["data"]["missing_pattern"],
-        num_steps=config["data"]["num_steps"],
-    )
+train_loader, valid_loader, test_loader, scaler = get_dataloader(args, config)
     
 data_info = args.misspattern + "_" + str(args.missrate)
 
-
 # Load Model
-
-
 config_diff = config["diffusion"]
 model = FADTI(
         data_name=args.data,
@@ -99,19 +79,25 @@ model = FADTI(
         device=args.device,
     )
 
+optimizer = AdamW(model.parameters(), lr=config["train"]["lr"], weight_decay=1e-6)
+
 model_info = args.ffttype + "_" + args.timetype
+
+# Load Model
+
 
 model_process = Process(
         model=model,
-        learning_rate=config["train"]["lr"],
         epochs=config["train"]["epochs"],
         save_strategy=config["train"]["save_strategy"],
-        device=args.device,            
+        scaler=scaler,
+        device=args.device, 
+        optimizer=optimizer,           
 )
 
 # Create Save Place
 current_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-foldername = "./save/" + args.model + "_" + model_info + "_" + args.data + "_" + data_info + "_" + current_time + "/"
+foldername = "./save/" + args.model + "_" + model_info + "_" + args.data + "_" + data_info + "_" + str(args.nsample) + "_" + current_time + "/"
 print('model folder:', foldername)
 os.makedirs(foldername, exist_ok=True)
 with open(foldername + "config.json", "w") as f:

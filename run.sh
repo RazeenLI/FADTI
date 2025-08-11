@@ -1,28 +1,23 @@
 #!/bin/bash
 
-# nohup ./run.sh > run.log 2>&1 & 
+# nohup ./run.sh > run2.log 2>&1 & 
 mkdir -p logs
-# 示例参数数组，可根据需要修改
-models=("csdi_ori" "csdi" "fadti")
-# ("csdi_ori" "csdi" "ftcsdi" "saits")
-datas=("ett" "weather")
-nfolds=(0 1 2 3 4)
+models=("mean" "median" "knn" "csdi" "fadti" "mtsci" "timemixerpp" "saits" "timesnet" "brits" "timemixer") 
+datas=("ett" "weather" "metr_la" "yeast") # "ett" "weather" "metr_la" "yeast"
+nfolds=(0 1 2 3 4) 
 missrates=(0.1 0.5)
 misspatterns=("point" "time")
-# nsample 和 device 可以直接定义
 nsample=100
-device="cuda:6"
+device="cuda:5"
 
-# 外层循环遍历所有参数组合
 for model in "${models[@]}"; do
     for data in "${datas[@]}"; do
          for nfold in "${nfolds[@]}"; do
             for missrate in "${missrates[@]}"; do
                 for misspattern in "${misspatterns[@]}"; do
-                    # 构造输出文件名，可以根据需求修改命名规则
                     output_file="logs/${model}_${data}_${nfold}.out"
-                    echo "Running: python run_old.py --model \"$model\" --data \"$data\" --nsample $nsample --device \"$device\" --nfold $nfold --misspattern \"$misspattern\" --missrate $missrate > $output_file"
-                    python run_old.py --model "$model" --data "$data" --nsample $nsample --device "$device" --nfold $nfold --misspattern "$misspattern" --missrate $missrate > "$output_file"
+                    echo "Running: python run_all.py --model \"$model\" --data \"$data\" --nsample $nsample --device \"$device\" --nfold $nfold --misspattern \"$misspattern\" --missrate $missrate > $output_file"
+                    python run_all.py --model "$model" --data "$data" --nsample $nsample --device "$device" --nfold $nfold --misspattern "$misspattern" --missrate $missrate > "$output_file"
                 done
             done
          done

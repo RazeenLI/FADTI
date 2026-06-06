@@ -295,7 +295,8 @@ class Process(object):
                     "RMSE": rmse,
                     "MAE": mae,
                     "MAPE": mape,
-                    "CRPS": crps
+                    "CRPS": crps,
+                    "Elapsed Time": elapsed_time,
                 })
 
 def quantile_loss(target, forecast, q: float, eval_points) -> float:

@@ -213,6 +213,7 @@ class FADTI(nn.Module):
         conditional_mask, 
         observed_mask, 
         side_info, 
+        noise_type="gaussian",
         set_step=-1
     ):
         batch_size, num_features, num_steps = observed_data.shape
@@ -225,8 +226,16 @@ class FADTI(nn.Module):
             step = torch.randint(0, self.num_diffusion_steps, [batch_size]).to(self.device)
 
         current_alpha = self.alpha_torch[step]  # (batch_size, 1, 1)
-
-        noise = torch.randn_like(observed_data)
+        if noise_type == "gaussian":
+            noise = torch.randn_like(observed_data)
+        elif noise_type == "laplace":
+            laplace = torch.distributions.Laplace(
+                loc=torch.zeros_like(observed_data),
+                scale=torch.ones_like(observed_data) / (2 ** 0.5)  # 方差≈1
+            )
+            noise = laplace.sample()
+        else: # uniform noise
+            noise = torch.rand_like(observed_data) * (2 * (3 ** 0.5)) - (3 ** 0.5)
         noisy_data = (current_alpha ** 0.5) * observed_data + (1.0 - current_alpha) ** 0.5 * noise
 
         total_input = self.set_input_to_diffusion_model(noisy_data, observed_data, conditional_mask) # (batch_size, 2|1, num_features, num_steps)

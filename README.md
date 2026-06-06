@@ -19,7 +19,7 @@ Summary of the Time Series Datasets Used in Our Experiments
 |---------|--------------|----------|------------|-------------------|-----------------------|-----------------|
 | ETTm1   | Energy       | 7        | 96         | 15 minutes        | 0%                    | 96              |
 | Weather | Meteorology  | 21       | 144        | 10 minutes        | 0.017%                 | 144             |
-| METR-LA | Traffic      | 207(9)   | 288        | 5 minutes         | 8.6%                   | 24              |
+| METR-LA | Traffic      | 207      | 288        | 5 minutes         | 8.6%                   | 24              |
 | Yeast   | Biology      | 7        | 185        | 5 minutes         | 0%                    | 186             |
 
 
@@ -60,10 +60,6 @@ Arguments
 - `--misspattern`: Missing pattern (point, time)
 - `--missrate`: Missing rate (0.1, 0.5, etc.)
 
-
-<!-- ## Results
-- 可以放一张表格（比如你之前的 dataset table 或性能对比）
-- 如果匿名投稿，结果只需要展示实验配置和输出格式，不要放真实论文图 -->
 
 ## License
 For review purposes only.

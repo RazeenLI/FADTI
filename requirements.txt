@@ -1,12 +1,10 @@
-dataset==1.6.2
 info_nce_pytorch==0.1.4
 linear_attention_transformer==0.19.1
 matplotlib==3.10.5
 numpy==2.3.2
 pandas==2.3.1
 PyYAML==6.0.2
-PyYAML==6.0.2
-scikit_learn==1.7.1
+scikit-learn==1.7.1
 scipy==1.16.1
 seaborn==0.13.2
 torch==2.5.1

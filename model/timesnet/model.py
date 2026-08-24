@@ -72,9 +72,7 @@ class TimesNet(nn.Module):
         #     "imputation": imputed_data,
         #     "reconstruction": reconstruction,
         # }
-        # print("imputed_data.shape before permute", imputed_data.shape)
         # imputed_data.permute(0, 2, 1)
-        # print("imputed_data.shape", imputed_data.shape)
 
         return imputed_data.permute(0, 2, 1)
     
@@ -228,4 +226,3 @@ def masked_mae_cal(inputs, target, mask):
 def masked_mse_cal(inputs, target, mask):
     """calculate Mean Squared Error"""
     return torch.sum(((inputs - target) * mask) ** 2) / (torch.sum(mask) + 1e-9)
-    

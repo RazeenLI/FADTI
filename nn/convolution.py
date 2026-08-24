@@ -104,8 +104,8 @@ class GatedDilatedConvolution_Old(nn.Module):
 class GatedDilatedConvolution(nn.Module):
     def __init__(
             self,
-            in_dim,              # 输入维度 = num_channels（embedding 之后）
-            out_dim,             # 输出维度 = num_channels（embedding
+            in_dim,              # Input dimension after embedding.
+            out_dim,             # Output dimension.
             residual_channels=32,
             dilation_channels=32,
             skip_channels=256,

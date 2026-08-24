@@ -2,7 +2,7 @@ import numpy as np
 import torch
 
 def create_gt_mask(single_mask, missing_ratio=0.1, rng=None):
-    # single_mask 的 shape 为 (H, W, ...) 表示单个数据的掩码
+    # single_mask has shape (H, W, ...) and represents one sample's mask.
     flat_mask = single_mask.reshape(-1).copy()
     obs_indices = np.where(flat_mask)[0]
     miss_indices = rng.choice(
@@ -24,14 +24,6 @@ def sample_mask(
         random = rng.random
         randint = rng.integers
 
-    # # 假设 observed_masks 的第一维代表不同的数据样本，shape = (N, ...)
-    # masks_list = []
-    # for i in range(observed_masks.shape[0]):
-    #     masks_list.append(create_gt_mask(observed_masks[i], missing_ratio=missing_ratio, rng=rng))
-
-    # masks = np.stack(masks_list, axis=0)
-
-    # return masks.astype("uint8")
     shape = observed_masks.shape
     p_noise = missing_ratio
 
@@ -103,10 +95,8 @@ class StandardScaler:
         return (x - mean[None, :, None]) / std[None, :, None]
 
     def inverse_transform_torch(self, x: torch.Tensor, device):
-        # print(self.mean, self.std)
         mean = torch.tensor(self.mean, dtype=torch.float32).to(device)
         std = torch.tensor(self.std, dtype=torch.float32).to(device)
-        # print(mean, std)
         return x * std[None, :, None] + mean[None, :, None]
 
 

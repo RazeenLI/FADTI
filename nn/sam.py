@@ -67,7 +67,7 @@ class SAM(torch.optim.Optimizer):
             for p in group["params"] if p.grad is not None
         ]
         if len(grad_list) == 0:
-            # 如果没有梯度，返回一个标量0
+            # Return a scalar zero when no gradients are available.
             return torch.tensor(0.0, device=shared_device)
         norm = torch.norm(torch.stack(grad_list), p=2)
         return norm

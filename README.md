@@ -7,7 +7,7 @@ We propose a modular Fourier Bias Projection (FBP) module that supports multiple
 
 ## Installation
 ```bash
-pip install -r requirements.txt
+python3 -m pip install -r requirements.txt
 ```
 
 ## Dataset
@@ -27,36 +27,38 @@ Summary of the Time Series Datasets Used in Our Experiments
 
 ### 1. Test all methods (background)
 ```bash
-nohup ./run.sh > run2.log 2>&1 &
+nohup ./run.sh > run_all.log 2>&1 &
 ```
-This will run all supported models with default settings defined in run.sh.
+This runs all supported models with the default settings in `run.sh`. The script
+uses `cuda:0` by default. Select another device with the `DEVICE` environment
+variable, for example `DEVICE=cuda:1 ./run.sh` or `DEVICE=cpu ./run.sh`.
 
 ### 2. Run FADTI directly (background)
 ```bash
-nohup ./run_fadti.sh > run2.log 2>&1 &
+nohup ./run_fadti.sh > run_fadti.log 2>&1 &
 ```
 This will execute the FADTI model with the predefined configuration in run_fadti.sh,
-redirecting both stdout and stderr to run2.log while running in the background.
+redirecting both stdout and stderr to `run_fadti.log` while running in the background.
 
 ### 3. Run a standard method
 ```bash
-python run_all.py --model "csdi" --data "ett" --nsample 100 --device "cuda:0" --nfold 5 --misspattern "point" --missrate 0.1 
+python3 run_all.py --model "csdi" --data "ett" --nsample 100 --device "cuda:0" --nfold 0 --misspattern "point" --missrate 0.1
 ```
 Replace `csdi` with the desired model name (e.g., `timesnet`, `timemixer`, `saits`).
 
 ### 4. Run a specific FADTI manually
 ```bash
-python run.py --model "fadti" --ffttype "dft" --timetype "point" --data "ett" --nsample 100 --device "cuda:0" --nfold 0 --misspattern "point" --missrate 0.1
+python3 run.py --model "fadti" --ffttype "dft" --timetype "attn" --data "ett" --nsample 100 --device "cuda:0" --nfold 0 --misspattern "point" --missrate 0.1
 ```
 Arguments
 
-- `--model`: Model name (Only Fadti)
-- `--ffttype`: Fourier transform type (dft, stft, frsst)
-- `--timetype`: Time masking type (point, time)
-- `--data`: Dataset name (ett, weather, metrla, yeast)
+- `--model`: Model name (`fadti`)
+- `--ffttype`: Fourier transform type (`none`, `dft`, `stft`, or `frsst`)
+- `--timetype`: Time-processing layer (`attn` or `conv`)
+- `--data`: Dataset name (`ett`, `weather`, `metr_la`, or `yeast`)
 - `--nsample`: Number of samples for imputation
 - `--device`: Device to run on (cpu, cuda:0, etc.)
-- `--nfold`: Number of folds for cross-validation
+- `--nfold`: Cross-validation fold index (0-4)
 - `--misspattern`: Missing pattern (point, time)
 - `--missrate`: Missing rate (0.1, 0.5, etc.)
 

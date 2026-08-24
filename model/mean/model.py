@@ -46,7 +46,7 @@ class Mean(nn.Module):
         data_flat = observed_data.permute(1, 0, 2).reshape(observed_data.size(1), -1)
         mask_flat = conditional_mask.permute(1, 0, 2).reshape(conditional_mask.size(1), -1)
 
-        # 避免除以 0
+        # Avoid division by zero.
         mask_sum = mask_flat.sum(dim=1)
         mask_sum[mask_sum == 0] = 1.0
 

@@ -142,13 +142,10 @@ class TemporalAttention(nn.Module):
         v_fft = v_fft.permute(1, 0, 2)
 
         # Fusion
-        # print("  → v shape:", v.shape)
-        # print("  → v_fft shape:", v.shape)
         v = torch.cat([v, v_fft], dim=-1)
         v = self.fusion_layer(v)
     
 
-        # print("  → attn input shape:", v.shape)
 
         # Attn | Conv
         if self.type_layer == "attn":
@@ -332,4 +329,3 @@ class DiffusionFADTI(nn.Module):
         x = x.reshape(batch_size, num_features, num_steps)
 
         return x
-        

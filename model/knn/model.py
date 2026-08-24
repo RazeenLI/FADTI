@@ -50,10 +50,10 @@ class KNN(nn.Module):
             data_step = observed_data[:, :, i].cpu().numpy()  # shape: [B, C]
             mask_step = conditional_mask[:, :, i].cpu().numpy()
 
-            data_step[mask_step == 0] = np.nan  # 标记缺失
+            data_step[mask_step == 0] = np.nan  # Mark missing values.
 
             nan_columns = np.all(np.isnan(data_step), axis=0)  # shape: [C]
-            data_step[:, nan_columns] = 0.0  # 或用列均值替代：np.nanmean(data_step, axis=0)
+            data_step[:, nan_columns] = 0.0  # Use zero when an entire column is missing.
 
             knn = KNNImputer(n_neighbors=k)
             imputed_step = knn.fit_transform(data_step)  # shape: [B, C]

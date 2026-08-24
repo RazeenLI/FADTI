@@ -231,7 +231,7 @@ class FADTI(nn.Module):
         elif noise_type == "laplace":
             laplace = torch.distributions.Laplace(
                 loc=torch.zeros_like(observed_data),
-                scale=torch.ones_like(observed_data) / (2 ** 0.5)  # 方差≈1
+                scale=torch.ones_like(observed_data) / (2 ** 0.5)  # Unit variance
             )
             noise = laplace.sample()
         else: # uniform noise
@@ -379,4 +379,3 @@ class FADTI(nn.Module):
             rand_for_mask[i][rand_for_mask[i].topk(num_masked).indices] = -1
         cond_mask = (rand_for_mask > 0).reshape(observed_mask.shape).float()
         return cond_mask
-    

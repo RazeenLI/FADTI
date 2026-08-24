@@ -65,7 +65,6 @@ class ScaledDotProductAttention(AttentionOperator):
 
         # apply masking on the attention map, this is optional
         if attn_mask is not None:
-            # print("attn.shape, attn_mask.shape", attn.shape, attn_mask.shape)
             attn = attn.masked_fill(attn_mask == 0, -torch.inf)
 
         # compute attention score [0, 1], then apply dropout

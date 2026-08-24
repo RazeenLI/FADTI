@@ -20,7 +20,7 @@ def create_data():
         observed_values.append(arr)
     observed_values
 
-    # 6. 以第一天的时间步数作为标准，筛选出符合要求的天的数据
+    # Use the first day's length as the reference and discard incomplete days.
     expected_time_steps = observed_values[0].shape[0]
     observed_values = [arr for arr in observed_values if arr.shape[0] == expected_time_steps]
 
@@ -144,7 +144,7 @@ class Weather_Dataset(Dataset):
             "observed_mask": self.observed_masks[index],
             "gt_mask": self.gt_masks[index],
             "timepoints": np.arange(self.eval_length),
-            "next_data": self.observed_values[index + 1] if (index + 1 in self.use_index_list) else np.zeros_like(self.observed_values[index])  # 占位张量
+            "next_data": self.observed_values[index + 1] if (index + 1 in self.use_index_list) else np.zeros_like(self.observed_values[index]),  # Placeholder tensor
         }
         return s
 

@@ -150,7 +150,7 @@ class Yeast_Dataset(Dataset):
             "observed_mask": self.observed_masks[index],
             "gt_mask": self.gt_masks[index],
             "timepoints": np.arange(self.eval_length),
-            "next_data": self.observed_values[index + 1] if (index + 1 in self.use_index_list) else np.zeros_like(self.observed_values[index])  # 占位张量
+            "next_data": self.observed_values[index + 1] if (index + 1 in self.use_index_list) else np.zeros_like(self.observed_values[index]),  # Placeholder tensor
         }
         return s
 

@@ -148,7 +148,7 @@ class ETT_Dataset(Dataset):
             "observed_mask": self.observed_masks[index],
             "gt_mask": self.gt_masks[index],
             "timepoints": np.arange(self.eval_length),
-            "next_data": self.observed_values[index + 1] if (index + 1 in self.use_index_list) else np.zeros_like(self.observed_values[index])  # 占位张量
+            "next_data": self.observed_values[index + 1] if (index + 1 in self.use_index_list) else np.zeros_like(self.observed_values[index]),  # Placeholder tensor
         }
         return s
 
@@ -261,14 +261,6 @@ def get_dataset(
 #         missing_pattern=missing_pattern
 #     )
 #     # gt_masks = (1 - (gt_masks | (1 - observed_masks))).astype('uint8')
-
-#     print(
-#         "Original missing ratio = {:.4f}\nArtificial missing pattern: {}\nOverall missing ratio = {:.4f}".format(
-#             1 - np.sum(observed_masks) / observed_masks.size,
-#             missing_pattern,
-#             1 - np.sum(gt_masks) / gt_masks.size,
-#         )
-#     )
 
 #     # data normalization
 #     observed_values = np.nan_to_num(observed_values)

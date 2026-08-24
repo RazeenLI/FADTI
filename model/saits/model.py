@@ -104,7 +104,6 @@ class SAITS(nn.Module):
         else:
             mask_time = None
         
-        # print("mask_time.shape", mask_time.shape)
         input_data = observed_data * conditional_mask
 
         (

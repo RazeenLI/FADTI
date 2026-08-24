@@ -44,14 +44,14 @@ class DummyExtension(nn.Module):
         """
         x: [B, C, context_window]
         output: [B, C, target_window]
-        不对输入内容进行任何变换，只进行裁剪或 padding
+        Leaves the input values unchanged and only crops or pads the time axis.
         """
         T = x.size(-1)
         if T > self.target_window:
-            return x[..., :self.target_window]  # 裁剪右边
+            return x[..., :self.target_window]  # Crop from the right.
         elif T < self.target_window:
             pad_len = self.target_window - T
-            return F.pad(x, (0, pad_len))  # 右侧 padding 0
+            return F.pad(x, (0, pad_len))  # Pad zeros on the right.
         else:
             return x
         
@@ -113,12 +113,12 @@ class STFTBiasProjection(nn.Module):
         super().__init__()
         self.context_window = context_window
         self.hop_length = context_window // 2
-        # 1）预先生成一个窗函数
+        # Precompute the window function.
         self.register_buffer('window', torch.hann_window(context_window))
 
-        # 2）对应 STFT 得到的频率 bin 数
+        # Number of frequency bins produced by the STFT.
         freq_bins = context_window // 2 + 1  
-        # 线性层输入维度 = freq_bins × frame_count
+        # Linear input dimension: freq_bins * frame_count.
         frame_count = ((target_window or context_window) - context_window) // self.hop_length + 1
 
         N = torch.arange(frame_count).float()  # time frame indices
@@ -137,9 +137,7 @@ class STFTBiasProjection(nn.Module):
         self.linear = nn.Linear(linear_input, target_window)
 
     def forward(self, x):
-        # x: (B, C, T), 最后一维是 time
-        # —— 把 DFT 换成 STFT —— 
-        # x: (B, C, T)
+        # x has shape (B, C, T), with time on the last axis.
         B, C, T = x.shape
         # 1) STFT per channel -> (B, C, freq_bins, frames)
         x2d = x.reshape(B*C, T)
@@ -158,12 +156,12 @@ class STFTBiasProjection(nn.Module):
         freq_bins, frames = X_stft.size(1), X_stft.size(2)
         X_stft = X_stft.reshape(B, C, freq_bins, frames)
 
-        # 保持原来基于实部/虚部的扩展逻辑（可选）
+        # Preserve the real/imaginary basis expansion.
         basis_cos = torch.einsum('bcfl,fl->bcfl', X_stft.real, self.cos) # X_stft.real # (B, C, freq_bins, frames) real
         basis_sin = torch.einsum('bcfl,fl->bcfl', X_stft.imag, self.sin) # X_stft.imag # imag
         x = basis_cos + basis_sin
 
-        # —— 扁平 & 投影 —— 
+        # Flatten and project.
         x = self.flatten(x)   # (B, C, freq_bins*frames*2)
         x = self.dropout(x)
         x = self.linear(x)    # (B, C, target_window)
@@ -237,7 +235,7 @@ class FrSSTBiasProjection(nn.Module):
         S = torch.zeros_like(X_stft)
         S = S.scatter_add(dim=2, index=bin_indices, src=X_stft)
         
-        # 保持原来基于实部/虚部的扩展逻辑（可选）
+        # Preserve the real/imaginary basis expansion.
         basis_cos = torch.einsum('bcfl,fl->bcfl', S.real, self.cos) # X_stft.real # (B, C, freq_bins, frames) real
         basis_sin = torch.einsum('bcfl,fl->bcfl', S.imag, self.sin) # X_stft.imag # imag
         S_proj = basis_cos + basis_sin
@@ -258,7 +256,6 @@ class FrSSTLike(nn.Module):
         self.time_steps = time_steps
         self.alpha = alpha
         self.kernel_size = kernel_size
-        # print("\n\n\n", in_channels, time_steps, num_freqs, alpha, kernel_size, "\n\n\n")
 
         self.frft_filters = nn.Conv1d(
             in_channels=in_channels,
@@ -282,7 +279,7 @@ class FrSSTLike(nn.Module):
     def _init_frft_filters(self, alpha):
         B = torch.arange(self.kernel_size).float()
         center = (self.kernel_size - 1) / 2.0
-        t = B - center  # 中心对称
+        t = B - center  # Center symmetrically around zero.
 
         chirps = []
         for i in range(self.num_freqs):

@@ -78,20 +78,6 @@ class Process(object):
             self.model.train()
             with tqdm(train_loader, mininterval=5.0, maxinterval=50.0, disable=self.disable_tqdm) as it:
                 for batch_index, batch_data in enumerate(it, start=1):
-                    # def closure():
-                    #     # it.write(f"Inside closure for batch {batch_index}")
-                    #     self.optimizer.zero_grad()    # 每次调用 closure 前清零梯度
-                    #     loss = self.model(batch_data)
-                    #     loss.backward()
-                    #     # 调试输出：打印梯度非空参数的数量
-                    #     # grad_count = sum(p.grad is not None for p in self.model.parameters())
-                    #     # it.write(f"Batch {batch_index}: Number of parameters with gradients: {grad_count}")
-                    #     return loss
-                    # # 使用 SAM/LookSAM 的 step()，它会内部调用 closure 两次
-                    # loss = closure()
-                    # self.optimizer.step(closure)
-                    # avg_loss += loss.item()
-
                     self.optimizer.zero_grad()
                     loss = self.model(batch_data)
                     loss.backward()
@@ -201,7 +187,6 @@ class Process(object):
                     elapsed_time += (end_time - start_time)
 
                     samples, c_target, eval_points, observed_points, observed_time = output # samples, observed_data, target_mask, observed_mask, observed_tp
-                    # print("samples, c_target, eval_points", samples.shape, c_target.shape, eval_points.shape)
                     
                     samples = samples.permute(0, 1, 3, 2)  # (B,nsample,L,K)
                     c_target = c_target.permute(0, 2, 1)  # (B,L,K)
@@ -209,7 +194,6 @@ class Process(object):
                     observed_points = observed_points.permute(0, 2, 1)
 
                     samples_median = samples.median(dim=1)
-                    # print("samples shape", samples.shape, "eval_points shape", eval_points.shape)
                     
                     all_target.append(c_target)
                     all_evalpoint.append(eval_points)
@@ -222,7 +206,6 @@ class Process(object):
                     error = (samples_orig - target_orig) * eval_points
                     # error = (samples_median.values - c_target) * eval_points
                     error_scaled = error * scaler
-                    # print(samples_median.values.shape, c_target.shape, error.sum())
 
                     mse_current = (error_scaled ** 2)
                     mae_current = torch.abs(error_scaled)
@@ -323,4 +306,3 @@ def calc_quantile_CRPS(target, forecast, eval_points, mean_scaler, scaler):
         q_loss = quantile_loss(target, q_pred, quantiles[i], eval_points)
         CRPS += q_loss / denom
     return CRPS.item() / len(quantiles)
-

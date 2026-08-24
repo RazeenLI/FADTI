@@ -51,7 +51,6 @@ class TokenEmbedding(nn.Module):
                 nn.init.kaiming_normal_(m.weight, mode="fan_in", nonlinearity="leaky_relu")
 
     def forward(self, x):
-        # print("x shape token embedding:", x.shape)
         x = self.tokenConv(x.permute(0, 2, 1)).transpose(1, 2)
         return x
 
@@ -144,7 +143,6 @@ class DataEmbedding(nn.Module):
 
     def forward(self, x, x_timestamp=None):
         if x_timestamp is None:
-            # print("x shape:", x.shape)
             x = self.value_embedding(x)
             if self.with_pos:
                 x += self.position_embedding(x, return_only_pos=True)

@@ -113,7 +113,6 @@ class MultiScaleSeasonCross(nn.Module):
         for i in range(len(season_list) - 1):
             out_low_res = self.cross_conv_season(out_high)
             # out_low_res = match_shape(out_low_res, out_low)
-            # print(f"out_low.shape: {out_low.shape}, out_low_res.shape: {out_low_res.shape}, out_high.shape: {out_high.shape}")
             out_low = out_low + out_low_res
             out_high = out_low
             if i + 2 <= len(season_list) - 1:
@@ -336,7 +335,6 @@ class BackboneTimeMixerPP(nn.Module):
             assert n_steps >= downsampling_window**downsampling_layers
             d_time_model = n_steps // (downsampling_window**downsampling_layers)
             d_kv = d_time_model // n_heads
-            # print(f"344, d_kv:{d_kv}, d_time_model:{d_time_model}, n_heads:{n_heads}, n_steps:{n_steps}, downsampling_window:{downsampling_window}, downsampling_layers{downsampling_layers}")
             if d_kv == 0:
                 d_kv = 1
             full_attn_operator = ScaledDotProductAttention(d_kv**0.5, dropout)

@@ -116,9 +116,6 @@ class TemporalAttention(nn.Module):
             method=method
         )
         self.fusion_layer = nn.Linear(num_channels * 2, num_channels)
-        # self.norm = nn.LayerNorm(num_channels)  # 针对每个时间步内的 channel 归一化
-
-
     def forward(self, x, base_shape, itp_x=None):
         batch_size, num_channels, num_features, num_steps = base_shape
         
@@ -132,12 +129,7 @@ class TemporalAttention(nn.Module):
         v_fft = v_fft.permute(1, 0, 2)
         # v self imformation, q other information
         # combine
-        # 简单平均融合（也可以采用加权或拼接后再映射 cat -> linear 的方式）
-        # v = (v + x_fft) / 2
-        # 加权
-        # weights = torch.softmax(torch.stack([self.alpha, self.beta]), dim=0)
-        # v = weights[0] * v + weights[1] * x_fft
-        # 拼接后再映射 cat -> linear
+        # Concatenate the two representations before projecting them.
         v = torch.cat([v, v_fft], dim=-1)
         v = self.fusion_layer(v)
 
@@ -322,4 +314,3 @@ class DiffusionFTCSDI(nn.Module):
         x = x.reshape(batch_size, num_features, num_steps)
 
         return x
-        

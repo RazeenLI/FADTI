@@ -1,5 +1,3 @@
-# python run_old.py --model "fadti" --data "ett" --nsample 100 --nfold 0 --missrate 0.1 --misspattern "point" --device "cuda:6" --modelfolder "ftcsdi_ett_point_0.1_20250404_085422"
-# python run_old.py --model "saits" --data "ett" --nsample 100 --nfold 0 --missrate 0.1 --misspattern "point" --device "cuda:6"
 import argparse
 import torch
 import datetime
@@ -15,15 +13,14 @@ from utils.loaders import get_dataloader, get_model_optimizer
 parser = argparse.ArgumentParser(description="model and data")
 
 parser.add_argument("--model", type=str, default="csdi", help="Name of the model to use")
-parser.add_argument("--data", type=str, default="physio", help="Name of the dataset to use")
-parser.add_argument('--device', default='cuda:0', help='Device for Attack')
+parser.add_argument("--data", type=str, default="ett", choices=["ett", "weather", "metr_la", "yeast"], help="Dataset to use")
+parser.add_argument('--device', default='cuda:0', help='Computation device')
 
 parser.add_argument("--modelfolder", type=str, default="")
 parser.add_argument("--nsample", type=int, default=100)
-parser.add_argument("--nfold", type=int, default=0) # for 5fold test (valid value:[0-4])
+parser.add_argument("--nfold", type=int, default=0, choices=range(5), help="Cross-validation fold (0-4)")
 parser.add_argument("--missrate", type=float, default=0.1) # 0.1 0.5
 parser.add_argument("--misspattern", type=str, default='point') # point block time
-# parser.add_argument("--method", type=str, default='point') # point block time
 
 args = parser.parse_args()
 print(args)
@@ -89,4 +86,3 @@ model_process.evaluate(
     scaler=1, 
     foldername=foldername
 )
-

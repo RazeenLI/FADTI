@@ -3,7 +3,7 @@
 mkdir -p logs
 ffttypes=("none" "dft" "stft" "frsst") # "none" "dft" 
 timetypes=("attn" "conv")
-datas=("ett" "weather" "yeast" "metr_la") # "ett" "weather" "yeast" "metr_la"
+datas=("ett" "weather" "yeast" "metr_la")
 nfolds=(0 1)
 missrates=(0.1 0.5)
 misspatterns=("point" "time")

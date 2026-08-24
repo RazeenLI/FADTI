@@ -2,7 +2,7 @@
 
 mkdir -p logs
 models=("mean" "median" "knn" "csdi" "fadti" "mtsci" "timemixerpp" "saits" "timesnet" "brits" "timemixer") 
-datas=("ett" "weather" "metr_la" "yeast") # "ett" "weather" "metr_la" "yeast"
+datas=("ett" "weather" "metr_la" "yeast")
 nfolds=(0 1 2 3 4) 
 missrates=(0.1 0.5)
 misspatterns=("point" "time")

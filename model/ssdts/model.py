@@ -1,7 +1,6 @@
 """SSD-TS wrapper adapted to this repository's unified interface.
 
-Place this file at: model/ssdts/model.py
-It follows the same public API as your other models:
+It follows the same public API as the other models:
     loss = model(batch)
     samples, target, eval_mask, observed_mask, observed_tp = model.evaluate(batch, nsample)
 """

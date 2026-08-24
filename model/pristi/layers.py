@@ -579,8 +579,6 @@ class DiffusionPriSTI(nn.Module):
 
         # if adj_file == 'AQI36':
         #     self.adj = get_adj_AQI36()
-        # elif adj_file == 'metr-la':
-        #     self.adj = get_similarity_metrla(thr=0.1)
         # elif adj_file == 'pems-bay':
         #     self.adj = get_similarity_pemsbay(thr=0.1)
 

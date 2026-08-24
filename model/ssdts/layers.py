@@ -1,8 +1,4 @@
-"""SSD-TS denoiser adapted for the unified imputation interface.
-
-Place this file at: model/ssdts/layers.py
-Dependencies: mamba_ssm, causal_conv1d, einops, torch.
-"""
+"""SSD-TS denoiser adapted for the unified imputation interface."""
 
 import math
 from typing import Tuple

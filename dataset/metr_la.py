@@ -35,7 +35,7 @@ def create_data():
 def get_data():
     # get total dataset, if not exit, create new dataset
     # 1. load data
-    path = ("./data/metrla.pk")
+    path = "./data/metr_la.pkl"
 
     if os.path.isfile(path):  
         # load data file
@@ -103,7 +103,7 @@ def get_dataloader(
     observed_values = scaler.transform(observed_values, observed_masks)
     observed_values = np.nan_to_num(observed_values)
 
-    train_dataset = MetrLA_Dataset(
+    train_dataset = METRLADataset(
         use_index_list=train_index,
         observed_masks=observed_masks, 
         observed_values=observed_values, 
@@ -112,7 +112,7 @@ def get_dataloader(
     )
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=1)
 
-    valid_dataset = MetrLA_Dataset(
+    valid_dataset = METRLADataset(
         use_index_list=valid_index, 
         observed_masks=observed_masks, 
         observed_values=observed_values, 
@@ -121,7 +121,7 @@ def get_dataloader(
     )
     valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=0)
 
-    test_dataset = MetrLA_Dataset(
+    test_dataset = METRLADataset(
         use_index_list=test_index, 
         observed_masks=observed_masks, 
         observed_values=observed_values, 
@@ -132,7 +132,7 @@ def get_dataloader(
 
     return train_loader, valid_loader, test_loader, scaler
 
-class MetrLA_Dataset(Dataset):
+class METRLADataset(Dataset):
     def __init__(self, observed_values, observed_masks, gt_masks, eval_length, use_index_list=None):
         self.eval_length = eval_length
         self.observed_values = observed_values

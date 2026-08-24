@@ -33,7 +33,7 @@ def get_dataloader(args, config):
             num_steps=config["data"]["num_steps"],
         )
     elif args.data == "metr_la":
-        from dataset.metrla import get_dataloader
+        from dataset.metr_la import get_dataloader
         train_loader, valid_loader, test_loader, scaler = get_dataloader(
             seed=config["data"]["seed"],
             nfold=args.nfold,
@@ -264,4 +264,38 @@ def get_model_optimizer(args, config):
             device=args.device,
         )
         optimizer = Adam(model.parameters(), lr=config["train"]["lr"], weight_decay=1e-6)
+    elif args.model == "ssdts":
+        from model.ssdts.model import SSDTS
+
+        config_diff = config["diffusion"]
+        config_model = config["model"]
+        model = SSDTS(
+            data_name=args.data,
+            num_features=config["data"]["num_features"],
+            num_steps=config["data"]["num_steps"],
+            layers=config_model["layers"],
+            seq_dim=config_model["seq_dim"],
+            res_channels=config_model["res_channels"],
+            diffusion_embedding_dim=config_model["diffusion_embedding_dim"],
+            diffusion_steps=config_diff["num_steps"],
+            beta_start=config_diff["beta_start"],
+            beta_end=config_diff["beta_end"],
+            schedule=config_diff["schedule"],
+            num_ssm=config_model["num_ssm"],
+            cond_ssm_num=config_model["cond_ssm_num"],
+            input_ssm_num=config_model["input_ssm_num"],
+            num_ch=config_model["num_ch"],
+            expand_c=config_model["expand_c"],
+            expand_s=config_model["expand_s"],
+            headdim_c=config_model["headdim_c"],
+            headdim_s=config_model["headdim_s"],
+            only_generate_missing=config_model.get("only_generate_missing", True),
+            valid_all_steps=config_model.get("valid_all_steps", False),
+            device=args.device,
+        )
+        optimizer = AdamW(
+            model.parameters(),
+            lr=config["train"]["lr"],
+            weight_decay=1e-6,
+        )
     return model, optimizer

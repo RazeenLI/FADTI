@@ -1,5 +1,5 @@
 
-#type: args
+# Shared configuration for non-trainable statistical baselines.
 
 diffusion:
   layers: 4 

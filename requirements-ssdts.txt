@@ -1,0 +1,4 @@
+-r requirements.txt
+einops
+mamba_ssm==2.2.2
+causal_conv1d==1.4.0

@@ -2,17 +2,7 @@ from torch.optim import AdamW, Adam
 
 
 def get_dataloader(args, config):
-    if args.data == "physio":
-        from dataset.physio import get_dataloader
-        train_loader, valid_loader, test_loader, scaler = get_dataloader(
-            seed=config["data"]["seed"],
-            nfold=args.nfold,
-            batch_size=config["data"]["batch_size"],
-            missing_ratio=args.missrate, # config["data"]["test_missing_ratio"],
-            missing_pattern=args.misspattern, # config["data"]["missing_pattern"],
-            num_steps=config["data"]["num_steps"],
-        )
-    elif args.data == "ett":
+    if args.data == "ett":
         from dataset.ett import get_dataloader
         train_loader, valid_loader, test_loader, scaler = get_dataloader(
             seed=config["data"]["seed"],
@@ -42,8 +32,8 @@ def get_dataloader(args, config):
             missing_pattern=args.misspattern, # config["data"]["missing_pattern"],
             num_steps=config["data"]["num_steps"],
         )
-    elif args.data == "yeast":
-        from dataset.yeast import get_dataloader
+    elif args.data == "ecoli":
+        from dataset.ecoli import get_dataloader
         train_loader, valid_loader, test_loader, scaler = get_dataloader(
             seed=config["data"]["seed"],
             nfold=args.nfold,

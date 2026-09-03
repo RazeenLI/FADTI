@@ -12,8 +12,17 @@ from utils.loaders import get_dataloader, get_model_optimizer
 # Load Arguments
 parser = argparse.ArgumentParser(description="model and data")
 
-parser.add_argument("--model", type=str, default="csdi", help="Name of the model to use")
-parser.add_argument("--data", type=str, default="ett", choices=["ett", "weather", "metr_la", "yeast"], help="Dataset to use")
+parser.add_argument(
+    "--model",
+    type=str,
+    default="csdi",
+    choices=[
+        "mean", "median", "knn", "csdi", "csdi_ori", "fadti", "saits",
+        "brits", "timesnet", "mtsci", "timemixer", "timemixerpp", "ssdts",
+    ],
+    help="Name of the model to use",
+)
+parser.add_argument("--data", type=str, default="ett", choices=["ett", "weather", "metr_la", "ecoli"], help="Dataset to use")
 parser.add_argument('--device', default='cuda:0', help='Computation device')
 
 parser.add_argument("--modelfolder", type=str, default="")
@@ -25,12 +34,12 @@ parser.add_argument("--misspattern", type=str, default='point') # point block ti
 args = parser.parse_args()
 print(args)
 
-no_train_modles = ["mean", "median", "knn"]
+no_train_models = ["mean", "median", "knn"]
 
 # Load model config
 path = "config/" + args.model + ".yaml"
-if "ftcsdi" in args.model or args.model in no_train_modles:
-    path = "config/ftcsdi.yaml"
+if args.model in no_train_models:
+    path = "config/simple.yaml"
 with open(path, "r") as f:
     config_model = yaml.safe_load(f)
 
@@ -69,7 +78,7 @@ with open(foldername + "config.json", "w") as f:
     json.dump(config, f, indent=4)
 
 # train new model or load old model
-if args.model not in no_train_modles:
+if args.model not in no_train_models:
     if args.modelfolder == "":
         model_process.train(
             train_loader=train_loader,

@@ -1,6 +1,6 @@
 import torch
 
-SUPPORTED_DATASETS = {"physio", "ett", "weather", "metr_la", "yeast"}
+SUPPORTED_DATASETS = {"ett", "weather", "metr_la", "ecoli"}
 
 
 def get_process_data(data_name):

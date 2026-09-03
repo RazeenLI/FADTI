@@ -18,7 +18,7 @@ parser.add_argument("--model", type=str, default="fadti", choices=["fadti"], hel
 parser.add_argument("--ffttype", type=str, default="dft", choices=["none", "dft", "stft", "frsst"], help="Fourier transform type")
 parser.add_argument("--timetype", type=str, default="attn", choices=["attn", "conv"], help="Time-processing layer")
 
-parser.add_argument("--data", type=str, default="ett", choices=["ett", "weather", "metr_la", "yeast"], help="Dataset to use")
+parser.add_argument("--data", type=str, default="ett", choices=["ett", "weather", "metr_la", "ecoli"], help="Dataset to use")
 parser.add_argument('--device', default='cuda:0', help='Computation device')
 
 parser.add_argument("--modelfolder", type=str, default="")

@@ -1,4 +1,6 @@
-# Fourier Bias Projection for Time Series Imputation
+# FADTI: Fourier and Attention Driven Diffusion for Multivariate Time Series Imputation
+
+[Paper](https://arxiv.org/abs/2512.15116)
 
 This repository contains the implementation of our time series imputation
 framework based on conditional diffusion models with frequency-domain inductive
@@ -8,7 +10,7 @@ biases.
 
 We propose a modular Fourier Bias Projection (FBP) module that supports multiple
 Fourier-based transforms, including DFT and our tailored implementations of STFT
-and FrSST. The module is designed to improve the modeling of stationary and
+and FSST. The module is designed to improve the modeling of stationary and
 non-stationary components in multivariate time series.
 
 ## Installation
@@ -27,7 +29,7 @@ directory.
 | ETTm1 | `ett` | Energy | 7 | 96 | 15 minutes | 0% | 96 |
 | Weather | `weather` | Meteorology | 21 | 144 | 10 minutes | 0.017% | 144 |
 | METR-LA | `metr_la` | Traffic | 207 | 288 | 5 minutes | 8.6% | 24 |
-| Yeast | `yeast` | Biology | 7 | 185 | 5 minutes | 0% | 186 |
+| E. coli | `ecoli` | Biology | 7 | 185 | 5 minutes | 0% | 185 |
 
 Use `metr_la` as the command-line identifier for the METR-LA dataset. See
 [`data/README.md`](data/README.md) for the files included with the repository.
@@ -99,7 +101,7 @@ The following identifiers are accepted by the model loader used by `run_all.py`:
 
 ### Common arguments
 
-- `--data`: Dataset identifier: `ett`, `weather`, `metr_la`, or `yeast`.
+- `--data`: Dataset identifier: `ett`, `weather`, `metr_la`, or `ecoli`.
 - `--device`: Computation device, such as `cpu`, `cuda:0`, or `cuda:1`.
 - `--nsample`: Number of imputation samples generated during evaluation.
 - `--nfold`: Cross-validation fold index from 0 to 4.
@@ -142,6 +144,12 @@ In addition to the core project dependencies, SSD-TS requires `einops`,
 `mamba_ssm`, and `causal_conv1d` in the execution environment. These packages
 are only imported when SSD-TS is selected. SSD-TS is not included in the default
 `run.sh` experiment grid.
+
+Install these optional dependencies with:
+
+```bash
+python3 -m pip install -r requirements-ssdts.txt
+```
 
 ## Batch Experiments
 
@@ -226,6 +234,25 @@ FADTI/
   environment, and random settings.
 - Small numerical differences may occur across GPU hardware and software stacks.
 
+## Citation
+
+If you find this repository useful, please cite our paper:
+
+```bibtex
+@article{li2025fadti,
+  author  = {Runze Li and Hanchen Wang and Wenjie Zhang and Binghao Li and
+             Yu Zhang and Xuemin Lin and Ying Zhang},
+  title   = {FADTI: Fourier and Attention Driven Diffusion for Multivariate
+             Time Series Imputation},
+  journal = {CoRR},
+  volume  = {abs/2512.15116},
+  year    = {2025},
+  doi     = {10.48550/arXiv.2512.15116}
+}
+```
+
 ## License
 
-For review purposes only.
+The original software in this repository is released under the MIT License.
+See [LICENSE](LICENSE) for details. Dataset files remain subject to their
+respective upstream terms.

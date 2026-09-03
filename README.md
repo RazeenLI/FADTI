@@ -1,6 +1,8 @@
 # FADTI: Fourier and Attention Driven Diffusion for Multivariate Time Series Imputation
 
-[Paper](https://arxiv.org/abs/2512.15116)
+Accepted at the 2026 IEEE International Conference on Data Mining (ICDM 2026).
+
+[Paper (arXiv)](https://arxiv.org/abs/2512.15116)
 
 This repository contains the implementation of our time series imputation
 framework based on conditional diffusion models with frequency-domain inductive
